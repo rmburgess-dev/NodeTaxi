@@ -11,7 +11,7 @@ tracking, 100-yard node/neighbor radius, 8 nodes per leg.
 
 | Target | Legs | Corridor legs | No-corridor legs | Selected nodes |
 |---|---:|---:|---:|---:|
-| Elwynn Forest, Goldshire | 11 | 11 | 0 | 88 |
+| Elwynn Forest, Goldshire | 11 | 11 | 0 | 86 |
 | Stranglethorn Vale, Grom'gol | 2 | 1 | 1 | 9 |
 | Hillsbrad, Tarren Mill | 3 | 3 | 0 | 24 |
 | Hinterlands, Aerie Peak | 3 | 3 | 0 | 24 |
@@ -30,12 +30,14 @@ For Elwynn Forest from Tirisfal:
 
 | `/nt max` | Selected nodes | Raw line length | Character |
 |---:|---:|---:|---|
-| 8 | 88 | ~12.7k yd | Short, clustered side trips |
+| 8 | 86 | ~12.2k yd | Short, clustered side trips |
 | 12 | 132 | ~14k yd | More stops, still local |
 | 20 | 220 | significantly longer | Too much wandering for the intended UX |
 
 The 8 default is the best fit for “known path with little journeys.” Users who
-want denser coverage can raise it explicitly.
+want denser coverage can raise it explicitly. A 0.9.20 visual pass also rejected
+a distance-only cluster ordering that produced more back-and-forth; the merge
+point is now pinned forward.
 
 ## Rolling stability
 

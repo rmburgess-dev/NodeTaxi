@@ -1508,11 +1508,13 @@ function NodeTaxi:BuildCorridorLeg(leg)
             offsetYards = math.sqrt(
                 (projection.dx * zoneWidth) ^ 2 + (projection.dy * zoneHeight) ^ 2)
         end
-        candidates[#candidates + 1] = {
-            node = node,
-            projection = projection,
-            offsetYards = offsetYards,
-        }
+        if offsetYards <= maxOffset then
+            candidates[#candidates + 1] = {
+                node = node,
+                projection = projection,
+                offsetYards = offsetYards,
+            }
+        end
     end
     table.sort(candidates, function(a, b)
         return a.projection.progress < b.projection.progress
@@ -1570,36 +1572,38 @@ function NodeTaxi:BuildCorridorLeg(leg)
             end
         end
         if startable then
+            -- Enter at the earliest startable node, merge at the latest
+            -- corridor projection. 2-opt only the middle so the branch
+            -- cannot finish behind its entry.
+            local merge = startable
+            for _, candidate in ipairs(group) do
+                if candidate.projection.progress > merge.projection.progress then
+                    merge = candidate
+                end
+            end
             local remaining = {}
             for _, candidate in ipairs(group) do
-                remaining[#remaining + 1] = candidate
+                if candidate ~= startable and candidate ~= merge then
+                    remaining[#remaining + 1] = candidate
+                end
             end
-            local ordered = {}
+            local ordered = { startable }
             local current = startable
-            while current do
-                ordered[#ordered + 1] = current
-                local index
+            while #remaining > 0 do
+                local best, bestIndex, bestDistance
                 for i, candidate in ipairs(remaining) do
-                    if candidate == current then
-                        index = i
-                        break
-                    end
-                end
-                if index then
-                    table.remove(remaining, index)
-                end
-                local best, bestDistance
-                for _, candidate in ipairs(remaining) do
                     local distance = yardsBetween(current.node, candidate.node)
                     if not bestDistance or distance < bestDistance then
-                        best, bestDistance = candidate, distance
+                        best, bestIndex, bestDistance = candidate, i, distance
                     end
                 end
+                ordered[#ordered + 1] = best
+                table.remove(remaining, bestIndex)
                 current = best
             end
-
-            -- 2-opt the local cluster order (entry stays first). This keeps
-            -- the branch from zig-zagging between nodes in a dense field.
+            if merge ~= startable then
+                ordered[#ordered + 1] = merge
+            end
             if #ordered >= 3 then
                 local function orderLength()
                     local total = 0
@@ -1611,8 +1615,8 @@ function NodeTaxi:BuildCorridorLeg(leg)
                 local bestLength = orderLength()
                 for _ = 1, 3 do
                     local improved = false
-                    for first = 2, #ordered - 1 do
-                        for last = first + 1, #ordered do
+                    for first = 2, #ordered - 2 do
+                        for last = first + 1, #ordered - 1 do
                             local a, b = first, last
                             while a < b do
                                 ordered[a], ordered[b] = ordered[b], ordered[a]
@@ -1637,12 +1641,7 @@ function NodeTaxi:BuildCorridorLeg(leg)
                 end
             end
 
-            local maxProgress = startable.projection.progress
-            for _, candidate in ipairs(group) do
-                if candidate.projection.progress > maxProgress then
-                    maxProgress = candidate.projection.progress
-                end
-            end
+            local maxProgress = merge.projection.progress
             local span = math.max(0, maxProgress - startable.projection.progress)
             local locked = 0
             for _, candidate in ipairs(group) do
@@ -1739,8 +1738,7 @@ function NodeTaxi:BuildCorridorLeg(leg)
             direct = 0,
             inCorridor = #candidates,
         }
-        if leg.isFirst or leg.isLast then
-            local route = { { x = leg.startX, y = leg.startY } }
+        local route = { { x = leg.startX, y = leg.startY } }
             local function push(x, y)
                 local last = route[#route]
                 if not last or math.abs(last.x - x) > 0.0001 or math.abs(last.y - y) > 0.0001 then
@@ -1759,9 +1757,6 @@ function NodeTaxi:BuildCorridorLeg(leg)
             leg.routePoints = route
             leg.plan.length = length * 1000
             leg.plan.direct = math.sqrt((leg.destX - leg.startX) ^ 2 + (leg.destY - leg.startY) ^ 2) * 1000
-        else
-            leg.routePoints = nil
-        end
         return true
     end
 

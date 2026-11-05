@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.20 - 2026-11-05
+
+- Pin each cluster's merge to its furthest corridor projection and 2-opt only
+  the middle nodes, so a branch cannot finish behind its entry and loop back.
+- Draw the corridor line on every leg that selects zero nodes, not just the
+  first/last leg. No zone in a multi-zone route goes blank.
+- Keep the 8-node default after the multi-waypoint comparison; 12/20 add too
+  much wandering for the intended UX.
+
 ## 0.9.19 - 2026-11-05
 
 - Allow rolling re-planning again once a completed node frees a slot, without

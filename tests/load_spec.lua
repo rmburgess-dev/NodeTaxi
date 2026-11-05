@@ -603,8 +603,21 @@ check("corridor data loaded", ADDON.CorridorData and ADDON.CorridorData.zones
 check("Silverpine leg has a corridor spine", silverpineLeg and silverpineLeg.corridorPoints
     and #silverpineLeg.corridorPoints >= 2,
     silverpineLeg and silverpineLeg.corridorPoints and #silverpineLeg.corridorPoints)
-check("corridor spine is real points", silverpineLeg and silverpineLeg.corridorPoints
+check("corridor reference is real points", silverpineLeg and silverpineLeg.corridorPoints
     and silverpineLeg.corridorPoints[1].x ~= nil and silverpineLeg.corridorPoints[1].y ~= nil)
+check("visible path is node-to-node", silverpineLeg and silverpineLeg.routePoints
+    and #silverpineLeg.routePoints > #silverpineLeg.corridorPoints,
+    silverpineLeg and silverpineLeg.routePoints and #silverpineLeg.routePoints)
+local routeTouchesNode = false
+if silverpineLeg and silverpineLeg.routePoints and silverpineLeg.nodes[1] then
+    for _, point in ipairs(silverpineLeg.routePoints) do
+        if math.abs(point.x - silverpineLeg.nodes[1].x) < 1e-9
+            and math.abs(point.y - silverpineLeg.nodes[1].y) < 1e-9 then
+            routeTouchesNode = true
+        end
+    end
+end
+check("visible path detours through the node", routeTouchesNode)
 local corridorLegs = 0
 for _, leg in ipairs(bakedRoute and bakedRoute.legs or {}) do
     if leg.corridorPoints then corridorLegs = corridorLegs + 1 end

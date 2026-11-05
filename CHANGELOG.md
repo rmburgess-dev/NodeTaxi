@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.1 - 2026-11-05
+
+- Keep the original dashed node-to-node taxi line. The corridor is now only
+  a hidden reference: nodes are selected/ordered along it, and the visible
+  line detours through each node before continuing along the reference.
+- Do not paint the corridor spine as its own line on the world map or
+  minimap.
+- Corridor-ordered nodes are stable; `/nt replan` no longer re-orders them
+  along a straight line.
+
 ## 0.9.0 - 2026-11-05
 
 - Add `corridors.lua`: 121 compact zone entrance→exit walking backbones

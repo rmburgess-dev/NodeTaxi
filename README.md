@@ -152,10 +152,10 @@ the same `UiMap` IDs as Forever. A target can have more than one connection
 nearest you. Land connections are preferred over transports when both reach
 the destination.
 
-The world map draws the corridor spine and the selected node icons for every
-leg on the route. The nodes are no longer joined by straight lines: the line
-is the road/walk corridor, and each icon is a resource you can detour to. If
-you are looking at the zone map, only that zone is visible; zoom out to the
+The world map draws the node-to-node dashed line and the selected node icons
+for every leg. The line follows the corridor reference between nodes and
+detours to each icon; the corridor itself is not painted as a separate line.
+If you are looking at the zone map, only that zone is visible; zoom out to the
 continent to see the full multi-zone path.
 
 Tirisfal Glades to Elwynn Forest, for example, uses:
@@ -187,11 +187,12 @@ navigation maps (GPLv3). It is 94 KB; the 12 MB navmesh is not bundled and
 there is no runtime dependency.
 
 NodeTaxi uses a corridor when both ends of a zone leg are known connection
-points. For the first and last leg, it uses the nearest published endpoint and
-draws a short connector to the player/target. Zones without a generated
-corridor fall back to transition points and node icons only — no invented
-straight line. Resource-node order is still selected in the corridor, but the
-node icons are not joined to each other.
+points, but only as a **reference**: it selects nodes by their progress along
+the corridor, then builds the visible dashed line through those nodes. For the
+first and last leg it uses the nearest published endpoint and a short
+connector to the player/target. Zones without a generated corridor fall back to
+transition points and node icons only — no invented straight line. The
+corridor spine itself is never painted.
 
 ### Baked Forever snapshot (included)
 
@@ -285,7 +286,8 @@ survives a session and can be inspected offline.
 * **Corridor coverage is limited to generated pairs.** 121 entrance/exit
   pairs are covered; if a route uses a crossing not in `corridors.lua`, that
   zone leg shows only its node icons and real transition points, not a guessed
-  road line. Node detours are deliberately not drawn as a single line.
+  road line. The corridor is a hidden reference; the visible line is the
+  node-to-node dashed path.
 * **Cross-zone routing uses published or observed crossings.** NodeTaxi never
   guesses a border from map geometry. It uses (a) the paired zone-connection
   coordinates in `transitions.lua`, published by Carbonite (GPLv3), for 63

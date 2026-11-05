@@ -1383,6 +1383,146 @@ function NodeTaxi:FindCorridor(mapID, fromX, fromY, toX, toY)
         false, false
 end
 
+local function ProjectOnCorridor(points, x, y)
+    local best = { distanceSq = math.huge }
+    local progress = 0
+    for i = 1, #points - 1 do
+        local a, b = points[i], points[i + 1]
+        local dx, dy = b.x - a.x, b.y - a.y
+        local lengthSq = dx * dx + dy * dy
+        local length = math.sqrt(lengthSq)
+        local t = 0
+        if lengthSq > 0 then
+            t = ((x - a.x) * dx + (y - a.y) * dy) / lengthSq
+            t = math.max(0, math.min(1, t))
+        end
+        local px, py = a.x + dx * t, a.y + dy * t
+        local ox, oy = x - px, y - py
+        local distanceSq = ox * ox + oy * oy
+        if distanceSq < best.distanceSq then
+            best = {
+                distanceSq = distanceSq,
+                segment = i,
+                t = t,
+                x = px,
+                y = py,
+                progress = progress + t * length,
+            }
+        end
+        progress = progress + length
+    end
+    best.total = progress
+    best.distance = math.sqrt(best.distanceSq)
+    return best
+end
+
+-- Turn a corridor into a visible node-to-node path: follow the corridor as
+-- the reference, insert each selected resource node at its projection, and
+-- connect the player/target with short connectors. The corridor itself is
+-- never drawn.
+function NodeTaxi:BuildCorridorLeg(leg)
+    if not leg.corridorPoints then
+        return false
+    end
+
+    local corridor = leg.corridorPoints
+    local candidates = {}
+    for _, node in ipairs(self:NodeListForMap(leg.map)) do
+        local projection = ProjectOnCorridor(corridor, node.x, node.y)
+        if projection.distance <= settings.corridor then
+            candidates[#candidates + 1] = {
+                node = node,
+                projection = projection,
+            }
+        end
+    end
+
+    table.sort(candidates, function(a, b)
+        if a.projection.progress == b.projection.progress then
+            return a.projection.distance < b.projection.distance
+        end
+        return a.projection.progress < b.projection.progress
+    end)
+
+    local selected = {}
+    for i = 1, math.min(#candidates, settings.maxNodes) do
+        selected[i] = candidates[i]
+    end
+
+    if #selected == 0 then
+        leg.nodes = {}
+        leg.routePoints = nil
+        leg.plan = {
+            nodes = {},
+            length = 0,
+            direct = 0,
+            inCorridor = #candidates,
+        }
+        return true
+    end
+
+    local events = {}
+    for _, item in ipairs(selected) do
+        local segment = item.projection.segment
+        events[segment] = events[segment] or {}
+        events[segment][#events[segment] + 1] = item
+    end
+    for _, list in pairs(events) do
+        table.sort(list, function(a, b)
+            return a.projection.t < b.projection.t
+        end)
+    end
+
+    local route = {}
+    local function Add(x, y)
+        local previous = route[#route]
+        if previous and math.abs(previous.x - x) < 0.0001 and math.abs(previous.y - y) < 0.0001 then
+            return
+        end
+        route[#route + 1] = { x = x, y = y }
+    end
+
+    Add(leg.startX, leg.startY)
+    if leg.corridorStart then
+        Add(leg.corridorStart.x, leg.corridorStart.y)
+    end
+    Add(corridor[1].x, corridor[1].y)
+
+    for i = 1, #corridor - 1 do
+        for _, item in ipairs(events[i] or {}) do
+            Add(item.projection.x, item.projection.y)
+            Add(item.node.x, item.node.y)
+        end
+        Add(corridor[i + 1].x, corridor[i + 1].y)
+    end
+
+    if leg.corridorEnd then
+        Add(leg.corridorEnd.x, leg.corridorEnd.y)
+    end
+    Add(leg.destX, leg.destY)
+
+    local length = 0
+    for i = 2, #route do
+        local dx, dy = route[i].x - route[i - 1].x, route[i].y - route[i - 1].y
+        length = length + math.sqrt(dx * dx + dy * dy)
+    end
+    local ddx, ddy = leg.destX - leg.startX, leg.destY - leg.startY
+    local direct = math.sqrt(ddx * ddx + ddy * ddy) * 1000
+
+    leg.nodes = {}
+    for _, item in ipairs(selected) do
+        leg.nodes[#leg.nodes + 1] = item.node
+    end
+    leg.routePoints = route
+    leg.plan = {
+        nodes = leg.nodes,
+        length = length * 1000,
+        direct = direct,
+        inCorridor = #candidates,
+    }
+    return true
+end
+
 function NodeTaxi:AttachCorridors(legs)
     local attached = 0
     for i, leg in ipairs(legs) do
@@ -1400,6 +1540,7 @@ function NodeTaxi:AttachCorridors(legs)
             if i == #legs and not exactEnd then
                 leg.corridorConnectorEnd = true
             end
+            self:BuildCorridorLeg(leg)
             attached = attached + 1
         end
     end
@@ -1608,6 +1749,13 @@ function NodeTaxi:BuildRoute(announce)
     if cross then
         corridorLegs = self:AttachCorridors(legs)
         cross.corridorLegs = corridorLegs
+        if legs[1] and legs[1].plan then
+            plan = legs[1].plan
+        end
+        totalNodes = 0
+        for i = 1, #legs do
+            totalNodes = totalNodes + #(legs[i].nodes or {})
+        end
     end
 
     local routeDest
@@ -1711,6 +1859,11 @@ end
 function NodeTaxi:ReplanFromCurrent(announce)
     local route = state.route
     if not route or route.preview then
+        return false
+    end
+    if route.cross and route.legs and route.legs[1] and route.legs[1].corridorPoints then
+        -- Corridor-ordered nodes are fixed along the reference path; a
+        -- straight-line re-order would cut across it.
         return false
     end
 

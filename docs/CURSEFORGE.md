@@ -22,11 +22,12 @@ waypoints — your arrow and destination stay exactly where they were.
 - **Crosses zone borders at real points.** NodeTaxi bakes Carbonite's paired
   Classic `ZoneConnections` coordinates (63 land, portal, boat, zeppelin and
   tram links), routes through this zone's nodes to the real point, and rebuilds
-  after you cross. It plans selected nodes in every zone and draws a compact
-  entrance→exit walking corridor spine instead of joining nodes with straight
-  lines; nodes are side-trip icons. The world map shows the current leg bright
-  and later legs dim. The minimap stays on the current leg. It never sends you
-  at a geometric map edge. `/nt crossings` lists the exact points; new or missing
+  after you cross. It plans selected nodes in every zone and keeps the
+  original dashed node-to-node taxi line; the line follows a hidden compact
+  entrance→exit corridor reference and detours through each node. The corridor
+  is never painted as a separate spine. The world map shows the current leg
+  bright and later legs dim. The minimap stays on the current leg. It never
+  sends you at a geometric map edge. `/nt crossings` lists the exact points; new or missing
   transitions are learned the first time you cross them, and client map-link
   pins fill remaining gaps.
 - **Hollow rings up close.** Inside 100 yards the icon becomes an empty ring,

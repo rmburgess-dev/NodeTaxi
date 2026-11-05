@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.17 - 2026-11-05
+
+- Add rolling corridor re-planning. As you move, the current leg is trimmed
+  at your projection onto the corridor and unvisited nodes ahead are
+  re-clustered with the 100-yard branch rule.
+- Newly nearby nodes can join the route while travelling, not just when the
+  route was first built.
+- Completed nodes are excluded from the rolling re-plan.
+
 ## 0.9.16 - 2026-11-05
 
 - Smooth the displayed route polyline with Catmull-Rom interpolation on the

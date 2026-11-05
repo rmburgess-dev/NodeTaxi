@@ -1433,6 +1433,29 @@ end
 -- the reference, insert each selected resource node at its projection, and
 -- connect the player/target with short connectors. The corridor itself is
 -- never drawn.
+local function TrimCorridor(corridor, progress)
+    local total = 0
+    for i = 1, #corridor - 1 do
+        local dx = corridor[i + 1].x - corridor[i].x
+        local dy = corridor[i + 1].y - corridor[i].y
+        local length = math.sqrt(dx * dx + dy * dy)
+        if progress <= total + length or i == #corridor - 1 then
+            local t = length > 0 and math.max(0, math.min(1, (progress - total) / length)) or 0
+            local start = {
+                x = corridor[i].x + dx * t,
+                y = corridor[i].y + dy * t,
+            }
+            local trimmed = { start }
+            for j = i + 1, #corridor do
+                trimmed[#trimmed + 1] = corridor[j]
+            end
+            return trimmed, start
+        end
+        total = total + length
+    end
+    return { corridor[#corridor] }, corridor[#corridor]
+end
+
 function NodeTaxi:BuildCorridorLeg(leg)
     if not leg.corridorPoints then
         return false
@@ -2239,15 +2262,67 @@ end
 -- Re-evaluate the remaining route from where the player is now. Completed
 -- nodes (those before route.index) are not fed back in, so the new order
 -- cannot send you back to something you already collected.
+-- Rolling refinement of the current corridor leg. The player's projection
+-- trims the corridor ahead; unvisited nodes are re-clustered from there, so
+-- newly nearby nodes can join the route as we move.
+function NodeTaxi:RefreshCurrentLeg()
+    local route = state.route
+    local leg = route and route.legs and route.legs[1]
+    if not (leg and leg.corridorPoints) then
+        return false
+    end
+
+    local mapID, px, py = self:GetPlayerZone()
+    if not mapID or mapID ~= leg.map or not px then
+        return false
+    end
+
+    local projection = ProjectOnCorridor(leg.corridorPoints, px, py)
+    if not projection or projection.progress <= 0.0001 then
+        return false
+    end
+
+    local trimmed, corridorStart = TrimCorridor(leg.corridorPoints, projection.progress)
+    local completed = {}
+    for i = 1, math.min((route.index or 1) - 1, #route.nodes) do
+        local node = route.nodes[i]
+        completed[string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))] = true
+    end
+
+    local allNodes = {}
+    for _, node in ipairs(self:NodeListForMap(mapID)) do
+        local key = string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))
+        if not completed[key] then
+            allNodes[#allNodes + 1] = node
+        end
+    end
+
+    leg.corridorPoints = trimmed
+    leg.corridorStart = corridorStart
+    leg.allNodes = allNodes
+    leg.startX, leg.startY = px, py
+    leg.isFirst = true
+    self:BuildCorridorLeg(leg)
+
+    route.nodes = leg.nodes or {}
+    route.plan = leg.plan or route.plan
+    route.index = 1
+    route.planX, route.planY, route.planAt = px, py, GetTime()
+    route.totalNodes = #route.nodes
+    for i = 2, #(route.legs or {}) do
+        route.totalNodes = route.totalNodes + #(route.legs[i].nodes or {})
+    end
+    self:Redraw()
+    return true
+end
+
 function NodeTaxi:ReplanFromCurrent(announce)
     local route = state.route
     if not route or route.preview then
         return false
     end
     if route.cross and route.legs and route.legs[1] and route.legs[1].corridorPoints then
-        -- Corridor-ordered nodes are fixed along the reference path; a
-        -- straight-line re-order would cut across it.
-        return false
+        return self:RefreshCurrentLeg()
     end
 
     local mapID, px, py = self:GetPlayerZone()

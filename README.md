@@ -342,6 +342,7 @@ survives a session and can be inspected offline.
 | `tests/route_spec.lua` | planner and projection unit tests |
 | `tests/seed_spec.lua` | validates the baked snapshot (counts, coordinates) |
 | `tests/load_spec.lua` | headless load/login/route/command smoke test |
+| `tests/multiwaypoint_spec.lua` | real-data multi-zone routes, fallback lines, rolling stability |
 
 Run the tests from the addon folder:
 
@@ -349,6 +350,7 @@ Run the tests from the addon folder:
 luac -p data.lua route.lua core.lua overlay.lua
 lua tests/route_spec.lua
 lua tests/load_spec.lua
+lua tests/multiwaypoint_spec.lua
 lua tests/seed_spec.lua
 ```
 
@@ -361,6 +363,7 @@ cd NodeTaxi
 luac -p data.lua route.lua core.lua overlay.lua
 lua tests/route_spec.lua
 lua tests/load_spec.lua
+lua tests/multiwaypoint_spec.lua
 lua tests/seed_spec.lua
 
 python3 tools/package.py      # dist/NodeTaxi-<version>.zip

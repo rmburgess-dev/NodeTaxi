@@ -627,6 +627,26 @@ check("visible path detours through the node", routeTouchesNode)
 check("every known leg node is exposed", silverpineLeg and silverpineLeg.allNodes
     and #silverpineLeg.allNodes >= #silverpineLeg.nodes,
     silverpineLeg and silverpineLeg.allNodes and #silverpineLeg.allNodes)
+
+-- A tight cluster: each node is within 100 yd of the previous one, so the
+-- branch walk must take all three before merging back to the corridor.
+local clusterLeg = {
+    map = 1421,
+    startX = silverpineLeg.startX,
+    startY = silverpineLeg.startY,
+    destX = silverpineLeg.destX,
+    destY = silverpineLeg.destY,
+    corridorPoints = silverpineLeg.corridorPoints,
+    corridorStart = silverpineLeg.corridorStart,
+    corridorEnd = silverpineLeg.corridorEnd,
+    allNodes = {
+        { x = 0.56, y = 0.40, kind = "ore", nodeID = 201 },
+        { x = 0.565, y = 0.405, kind = "ore", nodeID = 201 },
+        { x = 0.555, y = 0.395, kind = "ore", nodeID = 201 },
+    },
+}
+ADDON:BuildCorridorLeg(clusterLeg)
+check("branch takes the whole nearby cluster", #clusterLeg.nodes == 3, #clusterLeg.nodes)
 check("all-node display defaults on", ADDON.settings.allNodes == true)
 check("node deviation defaults to 100 yards", ADDON.settings.spur == 100,
     ADDON.settings.spur)

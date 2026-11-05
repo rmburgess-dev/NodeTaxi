@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.13 - 2026-11-05
+
+- Replace one-node-per-band selection with a branch walk: after reaching a
+  node, take every unvisited node within 100 yards of it, chaining the whole
+  cluster, then merge back to the furthest corridor point reached.
+- This means a tight cluster like the three nodes in Elwynn is walked as one
+  branch instead of being split across bands.
+- `/nt spur` controls both corridor deviation and the node-to-node branch
+  radius (default 100 yards).
+
 ## 0.9.12 - 2026-11-05
 
 - Set the default node deviation/sweep cap to **100 yards**, matching the

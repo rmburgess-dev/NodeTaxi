@@ -1443,6 +1443,40 @@ function NodeTaxi:BuildCorridorLeg(leg)
     local allNodes = leg.allNodes or self:NodeListForMap(leg.map)
     leg.allNodes = allNodes
     local maxOffset = math.min(settings.corridor, settings.spur or 100)
+    local neighborYards = settings.spur or 100
+
+    local function yardsBetween(a, b)
+        if zoneWidth and zoneHeight then
+            local dx, dy = (a.x - b.x) * zoneWidth, (a.y - b.y) * zoneHeight
+            return math.sqrt(dx * dx + dy * dy)
+        end
+        local dx, dy = a.x - b.x, a.y - b.y
+        return math.sqrt(dx * dx + dy * dy) * 1000
+    end
+
+    local cumulative = { 0 }
+    for i = 2, #corridor do
+        local dx = corridor[i].x - corridor[i - 1].x
+        local dy = corridor[i].y - corridor[i - 1].y
+        cumulative[i] = cumulative[i - 1] + math.sqrt(dx * dx + dy * dy)
+    end
+    local totalProgress = cumulative[#corridor]
+
+    local function PointAtProgress(progress)
+        progress = math.max(0, math.min(totalProgress, progress))
+        for i = 1, #corridor - 1 do
+            if progress <= cumulative[i + 1] then
+                local span = cumulative[i + 1] - cumulative[i]
+                local t = span > 0 and (progress - cumulative[i]) / span or 0
+                return {
+                    x = corridor[i].x + (corridor[i + 1].x - corridor[i].x) * t,
+                    y = corridor[i].y + (corridor[i + 1].y - corridor[i].y) * t,
+                }
+            end
+        end
+        return { x = corridor[#corridor].x, y = corridor[#corridor].y }
+    end
+
     local candidates = {}
     for _, node in ipairs(allNodes) do
         local projection = ProjectOnCorridor(corridor, node.x, node.y)
@@ -1458,44 +1492,79 @@ function NodeTaxi:BuildCorridorLeg(leg)
             }
         end
     end
-
     table.sort(candidates, function(a, b)
-        if a.projection.progress == b.projection.progress then
-            return a.projection.distance < b.projection.distance
-        end
         return a.projection.progress < b.projection.progress
     end)
 
-    -- Spread the picks through the zone instead of taking the first N near
-    -- the entrance. One candidate per equal progress band keeps Silverpine
-    -- from being represented only by its northern nodes.
-    local selected = {}
-    if #candidates <= settings.maxNodes then
+    -- Branch walk: start at the first unvisited node along the corridor,
+    -- then keep taking the nearest unvisited node within `neighborYards` of
+    -- the one just reached. When no neighbour remains, merge back to the
+    -- furthest corridor progress reached by the branch and continue.
+    local used = {}
+    local branches = {}
+    local selectedCount = 0
+    local cursorProgress = 0
+
+    while selectedCount < settings.maxNodes do
+        local startIndex
         for i = 1, #candidates do
-            selected[i] = candidates[i]
+            if not used[i] and candidates[i].projection.progress >= cursorProgress - 1e-9 then
+                startIndex = i
+                break
+            end
         end
-    else
-        local totalProgress = candidates[#candidates].projection.progress
-        local bands = math.max(1, settings.maxNodes)
-        for band = 1, bands do
-            local low = (band - 1) / bands * totalProgress
-            local high = band / bands * totalProgress
-            local best
-            for _, candidate in ipairs(candidates) do
-                local progress = candidate.projection.progress
-                if progress >= low and (progress < high or band == bands) then
-                    if not best or candidate.projection.distance < best.projection.distance then
-                        best = candidate
+        if not startIndex then
+            break
+        end
+
+        local branch = {}
+        local first = candidates[startIndex]
+        used[startIndex] = true
+        branch[#branch + 1] = first
+        selectedCount = selectedCount + 1
+        local current = first
+        local maxProgress = first.projection.progress
+
+        while selectedCount < settings.maxNodes do
+            local bestIndex, bestDistance
+            for i = 1, #candidates do
+                if not used[i] then
+                    local distance = yardsBetween(current.node, candidates[i].node)
+                    if distance <= neighborYards and (not bestDistance or distance < bestDistance) then
+                        bestIndex, bestDistance = i, distance
                     end
                 end
             end
-            if best then
-                selected[#selected + 1] = best
+            if not bestIndex then
+                break
             end
+            local nextNode = candidates[bestIndex]
+            used[bestIndex] = true
+            branch[#branch + 1] = nextNode
+            selectedCount = selectedCount + 1
+            current = nextNode
+            if nextNode.projection.progress > maxProgress then
+                maxProgress = nextNode.projection.progress
+            end
+        end
+
+        maxProgress = math.max(cursorProgress, maxProgress)
+        branches[#branches + 1] = {
+            entryProgress = first.projection.progress,
+            mergeProgress = maxProgress,
+            nodes = branch,
+        }
+        cursorProgress = maxProgress
+    end
+
+    local nodesOut = {}
+    for _, branch in ipairs(branches) do
+        for _, candidate in ipairs(branch.nodes) do
+            nodesOut[#nodesOut + 1] = candidate.node
         end
     end
 
-    if #selected == 0 then
+    if #nodesOut == 0 then
         leg.nodes = {}
         leg.plan = {
             nodes = {},
@@ -1504,30 +1573,17 @@ function NodeTaxi:BuildCorridorLeg(leg)
             inCorridor = #candidates,
         }
         if leg.isFirst or leg.isLast then
-            -- Entry and exit legs still need a visible route even when no
-            -- resource node fell inside the 75-yard sweep band.
             local route = { { x = leg.startX, y = leg.startY } }
-            if leg.corridorStart then
+            local function push(x, y)
                 local last = route[#route]
-                if math.abs(last.x - leg.corridorStart.x) > 0.0001
-                    or math.abs(last.y - leg.corridorStart.y) > 0.0001 then
-                    route[#route + 1] = { x = leg.corridorStart.x, y = leg.corridorStart.y }
+                if not last or math.abs(last.x - x) > 0.0001 or math.abs(last.y - y) > 0.0001 then
+                    route[#route + 1] = { x = x, y = y }
                 end
             end
-            for _, point in ipairs(corridor) do
-                local last = route[#route]
-                if math.abs(last.x - point.x) > 0.0001 or math.abs(last.y - point.y) > 0.0001 then
-                    route[#route + 1] = { x = point.x, y = point.y }
-                end
-            end
-            if leg.corridorEnd then
-                local last = route[#route]
-                if math.abs(last.x - leg.corridorEnd.x) > 0.0001
-                    or math.abs(last.y - leg.corridorEnd.y) > 0.0001 then
-                    route[#route + 1] = { x = leg.corridorEnd.x, y = leg.corridorEnd.y }
-                end
-            end
-            route[#route + 1] = { x = leg.destX, y = leg.destY }
+            if leg.corridorStart then push(leg.corridorStart.x, leg.corridorStart.y) end
+            for _, point in ipairs(corridor) do push(point.x, point.y) end
+            if leg.corridorEnd then push(leg.corridorEnd.x, leg.corridorEnd.y) end
+            push(leg.destX, leg.destY)
             local length = 0
             for i = 2, #route do
                 local dx, dy = route[i].x - route[i - 1].x, route[i].y - route[i - 1].y
@@ -1542,21 +1598,6 @@ function NodeTaxi:BuildCorridorLeg(leg)
         return true
     end
 
-    -- Smooth sweeps: leave the corridor at a node cluster's projection,
-    -- curve through the nodes in that segment, and rejoin the corridor at
-    -- the next point ahead. No straight return spur.
-    local bySegment = {}
-    for _, item in ipairs(selected) do
-        local segment = item.projection.segment
-        bySegment[segment] = bySegment[segment] or {}
-        bySegment[segment][#bySegment[segment] + 1] = item
-    end
-    for _, list in pairs(bySegment) do
-        table.sort(list, function(a, b)
-            return a.projection.t < b.projection.t
-        end)
-    end
-
     local route = {}
     local function Add(x, y, node)
         local previous = route[#route]
@@ -1568,11 +1609,8 @@ function NodeTaxi:BuildCorridorLeg(leg)
 
     local function CatmullRom(points, steps)
         local function at(index)
-            if index < 1 then
-                return points[1]
-            elseif index > #points then
-                return points[#points]
-            end
+            if index < 1 then return points[1] end
+            if index > #points then return points[#points] end
             return points[index]
         end
         for index = 1, #points - 1 do
@@ -1597,45 +1635,38 @@ function NodeTaxi:BuildCorridorLeg(leg)
         Add(leg.corridorStart.x, leg.corridorStart.y)
     end
     Add(corridor[1].x, corridor[1].y)
-    local currentX, currentY = corridor[1].x, corridor[1].y
+    local corridorIndex = 1
 
-    local nodesOut = {}
-    for i = 1, #corridor - 1 do
-        local list = bySegment[i]
-        if list then
-            local remaining = {}
-            for j = 1, #list do
-                remaining[j] = list[j]
-            end
-            local ordered = {}
-            while #remaining > 0 do
-                local bestIndex, bestDistance = 1, math.huge
-                for j, item in ipairs(remaining) do
-                    local dx, dy = item.node.x - currentX, item.node.y - currentY
-                    local distance = dx * dx + dy * dy
-                    if distance < bestDistance then
-                        bestIndex, bestDistance = j, distance
-                    end
-                end
-                local item = table.remove(remaining, bestIndex)
-                ordered[#ordered + 1] = item
-                nodesOut[#nodesOut + 1] = item.node
-                currentX, currentY = item.node.x, item.node.y
-            end
-
-            local sweep = { { x = list[1].projection.x, y = list[1].projection.y } }
-            for _, item in ipairs(ordered) do
-                sweep[#sweep + 1] = { x = item.node.x, y = item.node.y, node = item.node }
-            end
-            sweep[#sweep + 1] = { x = corridor[i + 1].x, y = corridor[i + 1].y }
-            CatmullRom(sweep, 6)
-            currentX, currentY = corridor[i + 1].x, corridor[i + 1].y
-        else
-            Add(corridor[i + 1].x, corridor[i + 1].y)
-            currentX, currentY = corridor[i + 1].x, corridor[i + 1].y
+    local function advanceCursor(progress)
+        while corridorIndex < #corridor and cumulative[corridorIndex + 1] <= progress + 1e-9 do
+            corridorIndex = corridorIndex + 1
         end
     end
 
+    local function appendCorridorTo(progress)
+        progress = math.max(0, math.min(totalProgress, progress))
+        while corridorIndex < #corridor and cumulative[corridorIndex + 1] <= progress - 1e-9 do
+            corridorIndex = corridorIndex + 1
+            Add(corridor[corridorIndex].x, corridor[corridorIndex].y)
+        end
+        local point = PointAtProgress(progress)
+        Add(point.x, point.y)
+        advanceCursor(progress)
+    end
+
+    for _, branch in ipairs(branches) do
+        appendCorridorTo(branch.entryProgress)
+        local sweep = { { x = PointAtProgress(branch.entryProgress).x, y = PointAtProgress(branch.entryProgress).y } }
+        for _, candidate in ipairs(branch.nodes) do
+            sweep[#sweep + 1] = { x = candidate.node.x, y = candidate.node.y, node = candidate.node }
+        end
+        local merge = PointAtProgress(branch.mergeProgress)
+        sweep[#sweep + 1] = { x = merge.x, y = merge.y }
+        CatmullRom(sweep, 6)
+        advanceCursor(branch.mergeProgress)
+    end
+
+    appendCorridorTo(totalProgress)
     if leg.corridorEnd then
         Add(leg.corridorEnd.x, leg.corridorEnd.y)
     end

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 - 2026-11-04
+
+- Bake Carbonite's Classic `ZoneConnections` dataset into `transitions.lua`:
+  63 paired, real coordinates for land passes, portals, boats, zeppelins and
+  the tram, using Forever's `UiMap` IDs.
+- Cross-zone routing now works immediately across the old world without
+  needing to learn each border first. `/nt crossings` lists the exact points.
+- Prefer land connections over transports when choosing a cross-zone path;
+  boats, zeppelins and portals remain available for cross-continent trips.
+- Keep learned crossings and client map links as overrides/new-zone coverage.
+- Attribute the GPLv3 Carbonite data separately from NodeTaxi's MIT code.
+
 ## 0.6.1 - 2026-11-04
 
 - Fix false cross-zone legs (for example a 0 yd "Silverpine exit" while

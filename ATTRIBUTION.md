@@ -32,6 +32,22 @@ The coordinate values are factual map positions, but the compilation is
 derived from those projects. `data.lua` is not covered by NodeTaxi's MIT
 license; see LICENSE.
 
+## Zone connection coordinates
+
+`transitions.lua` is a coordinate table derived from Carbonite's Classic
+`ZoneConnections` dataset:
+
+- Carbonite, IrcDirk and contributors
+- https://github.com/IrcDirk/Carbonite-All-in-One-Retail-Classic
+- file: `Carbonite/Data/classic/ZoneConnections.lua` (commit `edc6226`)
+- Carbonite is GPLv3. `transitions.lua` is distributed under GPLv3, not MIT;
+  see LICENSE.
+
+The table stores the paired zone-map coordinates Carbonite publishes for 63
+land crossings, portals, boats, zeppelins and the tram. NodeTaxi uses those
+points directly, converts the 0..100 zone percentages to normalised map
+coordinates, and prefers land connections when choosing a route.
+
 ## Resource artwork
 
 The per-node art in `Media/` (copper, tin, peacebloom, ...) comes from

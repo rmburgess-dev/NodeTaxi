@@ -29,6 +29,9 @@ the addon and the scripts in tools/) only. It does not apply to:
   * node coordinate data in data.lua, which is derived from the Forever tables
     of "GatherMate2 Data Wowhead classic" (Marrtin, based on Spinx's data),
     with coordinates originally collected by Wowhead users;
+  * zone connection coordinates in transitions.lua, derived from Carbonite's
+    Classic ZoneConnections dataset (IrcDirk and contributors), which is
+    GPLv3; that data file is distributed under GPLv3;
   * the resource artwork in Media/, taken from GatherMate2's Artwork folder
     (Nevcairiel and contributors), which is marked All Rights Reserved in the
     GatherMate2 TOC.

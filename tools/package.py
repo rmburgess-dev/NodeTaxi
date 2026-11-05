@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
-INCLUDE_ROOT_FILES = ("README.md", "CHANGELOG.md", "LICENSE", "ATTRIBUTION.md")
+INCLUDE_ROOT_FILES = ("README.md", "CHANGELOG.md", "LICENSE", "LICENSE-GPL-3.0.txt", "ATTRIBUTION.md")
 
 
 def read_version():

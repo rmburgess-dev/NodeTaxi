@@ -19,12 +19,12 @@ waypoints — your arrow and destination stay exactly where they were.
 - **Re-plans as you move.** Every 30 yards the remaining nodes are re-ordered
   from your current position; collected nodes are never revisited. Tune with
   `/nt replan`.
-- **Crosses zone borders at real points.** NodeTaxi uses crossings learned from
-  your actual zone changes plus the client's map-link pins, routes through this
-  zone's nodes to that point, and rebuilds after you cross. It never sends you
-  at a geometric map edge. If no real crossing is known, `/nt crossings` tells
-  you and the first walk through teaches it. Cross-continent trips work only
-  where map links connect the continents.
+- **Crosses zone borders at real points.** NodeTaxi bakes Carbonite's paired
+  Classic `ZoneConnections` coordinates (63 land, portal, boat, zeppelin and
+  tram links), routes through this zone's nodes to the real point, and rebuilds
+  after you cross. It never sends you at a geometric map edge. `/nt crossings`
+  lists the exact points; new or missing transitions are learned the first time
+  you cross them, and client map-link pins fill remaining gaps.
 - **Hollow rings up close.** Inside 100 yards the icon becomes an empty ring,
   so the game's own tracking dot remains visible in the center. Tune with
   `/nt ring`.

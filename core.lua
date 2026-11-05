@@ -1014,17 +1014,85 @@ local function GetMapInfoRaw(mapID)
     return nil
 end
 
-function NodeTaxi:GetTransitionEdges(mapID)
+-- Bake Carbonite's paired zone-connection coordinates. A target can have
+-- more than one crossing (for example two Dun Morogh passes); keep all of
+-- them and choose the one nearest the player when building the leg.
+NodeTaxi.seedEdges = {}
+do
+    local function AddSeedEdge(fromMap, toMap, fromX, fromY, toX, toY, kind, label)
+        local byTarget = NodeTaxi.seedEdges[fromMap]
+        if not byTarget then
+            byTarget = {}
+            NodeTaxi.seedEdges[fromMap] = byTarget
+        end
+        local list = byTarget[toMap]
+        if not list then
+            list = {}
+            byTarget[toMap] = list
+        end
+        -- Carbonite stores zone-map percentages (0..100); the planner uses
+        -- normalised 0..1 coordinates like every other map API.
+        list[#list + 1] = {
+            fromX = fromX / 100,
+            fromY = fromY / 100,
+            toX = toX / 100,
+            toY = toY / 100,
+            kind = kind or "link",
+            name = label,
+            source = "seed",
+        }
+    end
+
+    local data = ns.TransitionData
+    if data and data.connections then
+        for _, connection in ipairs(data.connections) do
+            AddSeedEdge(connection.a, connection.b, connection.ax, connection.ay,
+                connection.bx, connection.by, connection.kind, connection.name)
+            AddSeedEdge(connection.b, connection.a, connection.bx, connection.by,
+                connection.ax, connection.ay, connection.kind, connection.name)
+        end
+    end
+end
+
+local function ChooseSeedEdge(list, x, y)
+    if not x or #list == 1 then
+        return list[1]
+    end
+    local best, bestDistance = list[1], math.huge
+    for i = 1, #list do
+        local edge = list[i]
+        local dx, dy = edge.fromX - x, edge.fromY - y
+        local distance = dx * dx + dy * dy
+        if distance < bestDistance then
+            best, bestDistance = edge, distance
+        end
+    end
+    return best
+end
+
+function NodeTaxi:GetTransitionEdges(mapID, x, y)
     local edges = {}
 
-    local links = self:GetMapLinkEdges(mapID)
-    if links then
-        for target, edge in pairs(links) do
-            edges[target] = edge
+    -- Baked real coordinates first; if there are several crossings to the
+    -- same zone, use the one nearest the player.
+    local seeded = self.seedEdges[mapID]
+    if seeded then
+        for target, list in pairs(seeded) do
+            edges[target] = ChooseSeedEdge(list, x, y)
         end
     end
 
-    -- A learned crossing is authoritative and overrides a link pin.
+    -- Client map-link pins fill gaps that the baked data does not cover.
+    local links = self:GetMapLinkEdges(mapID)
+    if links then
+        for target, edge in pairs(links) do
+            if not edges[target] then
+                edges[target] = edge
+            end
+        end
+    end
+
+    -- A learned crossing is authoritative and overrides both.
     local learned = db.transitions[mapID]
     if learned then
         for target, edge in pairs(learned) do
@@ -1074,36 +1142,51 @@ function NodeTaxi:GetMapLinkEdges(mapID)
     return edges
 end
 
-function NodeTaxi:FindZoneRoute(startMap, destMap)
+function NodeTaxi:FindZoneRoute(startMap, destMap, startX, startY)
     if startMap == destMap then
         return { startMap }
     end
 
-    local queue = { { startMap } }
-    local visited = { [startMap] = true }
-    local head = 1
-    local maxDepth = 12
+    local distance = { [startMap] = 0 }
+    local pathTo = { [startMap] = { startMap } }
+    local open = { startMap }
+    local inOpen = { [startMap] = true }
 
-    while head <= #queue do
-        local path = queue[head]
-        head = head + 1
-        local current = path[#path]
+    while #open > 0 do
+        local bestIndex, bestMap, bestDistance = 1, open[1], distance[open[1]]
+        for i = 2, #open do
+            local candidate = open[i]
+            if distance[candidate] < bestDistance then
+                bestIndex, bestMap, bestDistance = i, candidate, distance[candidate]
+            end
+        end
+        table.remove(open, bestIndex)
+        inOpen[bestMap] = nil
 
-        if #path < maxDepth then
-            local edges = self:GetTransitionEdges(current)
-            for target in pairs(edges) do
-                if not visited[target] then
-                    visited[target] = true
-                    local nextPath = {}
-                    for i = 1, #path do
-                        nextPath[i] = path[i]
-                    end
-                    nextPath[#nextPath + 1] = target
+        if bestMap == destMap then
+            return pathTo[bestMap]
+        end
 
-                    if target == destMap then
-                        return nextPath
-                    end
-                    queue[#queue + 1] = nextPath
+        local edges = self:GetTransitionEdges(bestMap,
+            bestMap == startMap and startX or nil,
+            bestMap == startMap and startY or nil)
+        for target, edge in pairs(edges) do
+            -- Prefer walking. Boats, zeppelins, portals and the tram are
+            -- allowed, but only when they are genuinely the better route
+            -- (normally a cross-continent trip).
+            local cost = (edge.kind == "land" or edge.source == "learned") and 1 or 10
+            local candidate = distance[bestMap] + cost
+            if not distance[target] or candidate < distance[target] then
+                distance[target] = candidate
+                local path = {}
+                for i = 1, #pathTo[bestMap] do
+                    path[i] = pathTo[bestMap][i]
+                end
+                path[#path + 1] = target
+                pathTo[target] = path
+                if not inOpen[target] then
+                    open[#open + 1] = target
+                    inOpen[target] = true
                 end
             end
         end
@@ -1117,7 +1200,8 @@ function NodeTaxi:BuildCrossPath(zoneRoute, playerMap, px, py, dest)
 
     for i = 2, #zoneRoute do
         local from, to = zoneRoute[i - 1], zoneRoute[i]
-        local edge = self:GetTransitionEdges(from)[to]
+        local edge = self:GetTransitionEdges(from, from == playerMap and px or nil,
+            from == playerMap and py or nil)[to]
         if edge and edge.fromX then
             path[#path + 1] = {
                 map = from,
@@ -1273,7 +1357,7 @@ function NodeTaxi:BuildRoute(announce)
     local cross
 
     if playerMap ~= dest.map then
-        local zoneRoute = self:FindZoneRoute(playerMap, dest.map)
+        local zoneRoute = self:FindZoneRoute(playerMap, dest.map, px, py)
         if not zoneRoute then
             self:ClearRoute(nil, true)
             if announce then
@@ -1292,7 +1376,7 @@ function NodeTaxi:BuildRoute(announce)
             return false
         end
 
-        local edge = self:GetTransitionEdges(playerMap)[zoneRoute[2]]
+        local edge = self:GetTransitionEdges(playerMap, px, py)[zoneRoute[2]]
         if not (edge and edge.fromX) then
             self:ClearRoute(nil, true)
             if announce then
@@ -1408,14 +1492,18 @@ function NodeTaxi:BuildRoute(announce)
                     nextName, MapName(playerMap) or "this zone",
                     MapName(dest.map) or "target",
                     plan.length, plan.direct, percent,
-                    " [" .. (cross.source == "link" and ("map link: " .. tostring(cross.name or "?")) or "learned crossing") .. "]"))
+                    " [" .. (cross.source == "seed"
+                        and ("Carbonite " .. tostring(cross.edge.kind or "crossing") .. (cross.name and (": " .. cross.name) or ""))
+                        or (cross.source == "link" and ("map link: " .. tostring(cross.name or "?")) or "learned crossing")) .. "]"))
             else
                 Print(string.format(
                     "no known nodes on this leg; path to the %s exit in %s (then %s): %.0f yd%s",
                     nextName, MapName(playerMap) or "this zone",
                     MapName(dest.map) or "target",
                     plan.length,
-                    " [" .. (cross.source == "link" and ("map link: " .. tostring(cross.name or "?")) or "learned crossing") .. "]"))
+                    " [" .. (cross.source == "seed"
+                        and ("Carbonite " .. tostring(cross.edge.kind or "crossing") .. (cross.name and (": " .. cross.name) or ""))
+                        or (cross.source == "link" and ("map link: " .. tostring(cross.name or "?")) or "learned crossing")) .. "]"))
             end
         else
             Print(string.format(
@@ -2001,7 +2089,9 @@ local function PrintDebug()
     if route and route.cross then
         Print(string.format("cross-zone leg: next %s via %s",
             tostring(MapName(route.cross.nextMap or route.dest.map) or "?"),
-            route.cross.source == "link" and ("map link " .. tostring(route.cross.name or "?")) or "learned crossing"))
+            (route.cross.source == "seed"
+                and ("Carbonite " .. tostring(route.cross.edge.kind or "crossing") .. (route.cross.name and (": " .. route.cross.name) or ""))
+                or (route.cross.source == "link" and ("map link " .. tostring(route.cross.name or "?")) or "learned crossing"))))
     end
 
     if NodeTaxi.NodeIcon then
@@ -2220,7 +2310,9 @@ local function HandleCommand(message)
                 local edge = item.edge
                 Print(string.format("  -> %s via %s at %s%s",
                     MapName(item.target) or ("map " .. item.target),
-                    edge.source == "link" and ("map link " .. tostring(edge.name or "?")) or "learned",
+                    edge.source == "seed"
+                        and ("Carbonite " .. tostring(edge.kind or "crossing") .. (edge.name and (": " .. edge.name) or ""))
+                        or (edge.source == "link" and ("map link " .. tostring(edge.name or "?")) or "learned"),
                     CoordText(edge.fromX, edge.fromY),
                     edge.toX and (" (entry " .. CoordText(edge.toX, edge.toY) .. ")") or ""))
             end

@@ -100,6 +100,9 @@ _G.C_Map = {
         if id == 1420 then
             return { name = "Tirisfal Glades", parentMapID = 1419, mapType = 3 }
         end
+        if id == 2482 then
+            return { name = "Mount Hyjal", parentMapID = 1414, mapType = 3 }
+        end
         return { name = "Eastern Kingdoms", parentMapID = 0, mapType = 2 }
     end,
     GetMapRectOnMap = function(child, parent)
@@ -200,6 +203,7 @@ local function loadAddonFile(path)
     chunk("NodeTaxi", ADDON)
 end
 
+loadAddonFile("transitions.lua")
 loadAddonFile("route.lua")
 loadAddonFile("core.lua")
 loadAddonFile("overlay.lua")
@@ -536,6 +540,53 @@ NodeTaxiDB.transitions = {}
 ADDON.mapLinkCache = {}
 C_Map.GetMapLinksForMap = nil
 
+-- 1b. Baked Carbonite coordinate table.
+local seedData = ADDON.TransitionData
+check("baked transition table loaded", seedData and #seedData.connections == 63,
+    seedData and #seedData.connections)
+
+local function findSeed(a, b)
+    for _, c in ipairs(seedData.connections) do
+        if (c.a == a and c.b == b) or (c.a == b and c.b == a) then
+            return c
+        end
+    end
+end
+
+local tirisfalSilverpine = findSeed(1420, 1421)
+check("baked Tirisfal-Silverpine crossing exists", tirisfalSilverpine ~= nil)
+if tirisfalSilverpine then
+    local ax = tirisfalSilverpine.a == 1420 and tirisfalSilverpine.ax or tirisfalSilverpine.bx
+    local ay = tirisfalSilverpine.a == 1420 and tirisfalSilverpine.ay or tirisfalSilverpine.by
+    check("baked Tirisfal-Silverpine exact exit", ax == 54.14 and ay == 75.77, tostring(ax) .. "," .. tostring(ay))
+end
+
+local tirisfalWPL = findSeed(1420, 1422)
+check("baked Tirisfal-WPL crossing exists", tirisfalWPL ~= nil)
+local elwynnPath = ADDON:FindZoneRoute(1420, 1429, 0.567, 0.494)
+check("baked route reaches Elwynn", elwynnPath and elwynnPath[#elwynnPath] == 1429)
+check("baked route starts at Tirisfal", elwynnPath and elwynnPath[1] == 1420)
+
+-- 2. Baked Carbonite points route immediately, before any learning.
+NodeTaxiDB.transitions = {}
+C_Map.GetMapLinksForMap = nil
+ADDON.mapLinkCache = {}
+playerZoneMap = 1420
+playerZoneX, playerZoneY = 0.567, 0.494
+ADDON.state.dest = { map = 1429, x = 0.8, y = 0.5, title = "Baked transition test" }
+local bakedBuilt = ADDON:BuildRoute(true)
+check("baked crossing builds immediately", bakedBuilt == true)
+local bakedRoute = ADDON.state.route
+check("baked crossing source", bakedRoute and bakedRoute.cross
+    and bakedRoute.cross.source == "seed")
+check("baked crossing next map", bakedRoute and bakedRoute.cross.nextMap == 1421,
+    bakedRoute and bakedRoute.cross and bakedRoute.cross.nextMap)
+check("baked crossing uses real Tirisfal exit", bakedRoute and bakedRoute.dest.map == 1420
+    and math.abs(bakedRoute.dest.x - 0.5414) < 1e-6
+    and math.abs(bakedRoute.dest.y - 0.7577) < 1e-6)
+check("baked crossing is not a huge geometric jump", bakedRoute and bakedRoute.plan.length < 2000,
+    bakedRoute and bakedRoute.plan.length)
+
 -- 1. Learn a crossing from an actual zone change.
 playerZoneMap = 1420
 playerZoneX, playerZoneY = 0.49, 0.5
@@ -549,7 +600,7 @@ check("learned crossing has a real exit", learned and learned.fromX == 0.49 and 
 check("learned crossing has a real entry", learned and learned.toX == 0.01 and learned.toY == 0.5)
 check("reverse crossing is learned", NodeTaxiDB.transitions[1429] and NodeTaxiDB.transitions[1429][1420] ~= nil)
 
--- 2. Build a cross-zone leg using the learned point.
+-- 3. Build a cross-zone leg using the learned point.
 playerZoneMap = 1420
 playerZoneX, playerZoneY = 0.2, 0.5
 slash("crossings")
@@ -607,13 +658,13 @@ check("map-link exit used", ADDON.state.route and ADDON.state.route.dest.x == 0.
 check("map-link name recorded", ADDON.state.route and ADDON.state.route.cross
     and ADDON.state.route.cross.name == "Test Link")
 
--- 5. With no learned crossing and no link, refuse the leg instead of guessing.
+-- 5. With no baked crossing, learned crossing, or link, refuse the leg.
 NodeTaxiDB.transitions = {}
 C_Map.GetMapLinksForMap = nil
 ADDON.mapLinkCache = {}
 playerZoneMap = 1420
 playerZoneX, playerZoneY = 0.2, 0.5
-ADDON.state.dest = { map = 1429, x = 0.8, y = 0.5, title = "No transition test" }
+ADDON.state.dest = { map = 2482, x = 0.8, y = 0.5, title = "No transition test" }
 local noRouteBuilt = ADDON:BuildRoute(true)
 check("unknown crossing yields no route", noRouteBuilt == false)
 check("unknown crossing leaves no stale route", ADDON.state.route == nil)

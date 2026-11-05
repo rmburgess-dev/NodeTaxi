@@ -28,11 +28,12 @@ reads the active target once at login) to learn *where* you are going.
    detour budget.
 5. Re-evaluates the remaining route as you move (every 30 yards by default),
    so the order follows your actual position instead of the original start.
-   Targets in another zone get a **real-crossing leg**: NodeTaxi uses crossings
-   learned from your actual zone changes plus the client's map-link pins, routes
-   through this zone's nodes to that real point, and rebuilds the next leg after
-   you cross. A dim continuation line shows the following zones. If no real
-   crossing is known, it says so instead of pointing at a mountain.
+   Targets in another zone get a **real-crossing leg**: NodeTaxi uses paired
+   zone-connection coordinates baked from Carbonite's Classic dataset, plus
+   crossings learned from your actual zone changes and the client's map-link
+   pins. It routes through this zone's nodes to the real point and rebuilds the
+   next leg after you cross. A dim continuation line shows the following zones.
+   It never guesses a geometric border or map edge.
 6. Draws the result as **dashes on the world map** and on the **minimap**,
    with a Herb Gathering/Mining **resource icon** per node and a larger pulsing
    icon for the next one. Inside the ring distance (100 yd by default) the icon
@@ -141,6 +142,36 @@ nodes and ore routes; a herbalist sees only herbs. Switching tracking rebuilds
 the route automatically on `MINIMAP_UPDATE_TRACKING`. `/nt kind herb`, `ore`, or
 `both` overrides this; `/nt kind auto` returns to tracking-driven filtering.
 
+### Baked zone connections (included)
+
+`transitions.lua` is generated from Carbonite's Classic `ZoneConnections`
+dataset (commit `edc6226`, GPLv3). It provides **paired** coordinates for 63
+real connections — land passes, portals, boats, zeppelins and the tram — using
+the same `UiMap` IDs as Forever. A target can have more than one connection
+(for example two Dun Morogh passes); NodeTaxi keeps each and picks the one
+nearest you. Land connections are preferred over transports when both reach
+the destination.
+
+Tirisfal Glades to Elwynn Forest, for example, uses:
+
+```
+1420 Tirisfal       54.14,75.77  ->  1421 Silverpine     67.56, 5.45
+1421 Silverpine     66.36,79.80  ->  1424 Hillsbrad      14.35,46.20
+1424 Hillsbrad      81.96,56.91  ->  1417 Arathi         20.34,29.73
+1417 Arathi         45.45,89.06  ->  1437 Wetlands        51.06,11.95
+1437 Wetlands       53.97,70.33  ->  1432 Loch Modan      25.57,10.47
+1432 Loch Modan     47.19,80.82  ->  1418 Badlands        49.36, 7.97
+1418 Badlands        1.09,62.92  ->  1427 Searing Gorge   76.63,56.67
+1427 Searing Gorge  34.81,83.74  ->  1428 Burning Steppes 31.83,50.44
+1428 Burning Steppes 78.85,82.50 ->  1433 Redridge        46.52, 8.56
+1433 Redridge        8.95,71.90  ->  1429 Elwynn         93.21,72.27
+```
+
+The other Tirisfal option is Western Plaguelands: `84.09,70.49` on the
+Tirisfal side, `28.62,57.46` in the Plaguelands. Cross-continent boats and
+zeppelins are in the table too; `/nt crossings` prints the available points for
+your current zone.
+
 ### Baked Forever snapshot (included)
 
 `data.lua` is generated from the **Forever** tables of *GatherMate2 Data
@@ -230,16 +261,16 @@ survives a session and can be inspected offline.
 
 ## Known limitations (by design for this first version)
 
-* **Cross-zone routing needs a known real crossing.** NodeTaxi never guesses a
-  border from map geometry. It uses (a) crossings it learned from an actual
-  `ZONE_CHANGED_NEW_AREA` transition, with the real positions on both sides,
-  and (b) the client's map-link pins (`C_Map.GetMapLinksForMap`), which are real
-  map-transition points. If neither is known for the next zone, it refuses the
-  leg and tells you to walk through the border or portal once; after that the
-  crossing is remembered. `/nt crossings` lists what it knows. Cross-continent
-  trips only work when map links connect the continents; otherwise they are
-  reported as unavailable. Terrain and impassable ground are still not
-  modelled beyond the real crossing points.
+* **Cross-zone routing uses published or observed crossings.** NodeTaxi never
+  guesses a border from map geometry. It uses (a) the paired zone-connection
+  coordinates in `transitions.lua`, published by Carbonite (GPLv3), for 63
+  land/portal/boat/zeppelin/tram connections in the old world; (b) crossings it
+  learned from an actual `ZONE_CHANGED_NEW_AREA` transition, with the real
+  positions on both sides; and (c) the client's map-link pins
+  (`C_Map.GetMapLinksForMap`). New zones or transitions missing from the baked
+  table are learned the first time you cross them. It refuses a leg when no
+  real point is known rather than pointing at a mountain. `/nt crossings` lists
+  what it knows. Terrain between the published points is still not modelled.
 * **No terrain data.** The dashes are straight lines between coordinates, not a
   navigable path. Cliffs, water, roads and flight paths are not modelled; the
   route is a suggestion, not an autopilot. Re-planning every 30 yards does not

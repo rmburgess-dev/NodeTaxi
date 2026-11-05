@@ -643,7 +643,7 @@ local clusterLeg = {
         { x = 0.56, y = 0.40, kind = "ore", nodeID = 201 },
         { x = 0.565, y = 0.405, kind = "ore", nodeID = 201 },
         { x = 0.555, y = 0.395, kind = "ore", nodeID = 201 },
-        { x = 0.560, y = 0.300, kind = "ore", nodeID = 201 },
+        { x = 0.555, y = 0.480, kind = "ore", nodeID = 201 },
     },
 }
 ADDON:BuildCorridorLeg(clusterLeg)

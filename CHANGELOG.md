@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.21 - 2026-11-05
+
+- Remove duplicate Catmull-Rom smoothing of the world route line.
+- Dim the non-route all-node field (alpha 0.32, 7 px) so the yellow journey
+  line reads first while every known node remains visible.
+- Fix a stale test node after the 100-yard candidate-band change.
+
 ## 0.9.20 - 2026-11-05
 
 - Pin each cluster's merge to its furthest corridor projection and 2-opt only

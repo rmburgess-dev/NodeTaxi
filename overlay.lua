@@ -426,7 +426,7 @@ function NodeTaxi:RedrawWorld()
                     local nx, ny = ToScreen(zone.map, node.x, node.y)
                     if nx then
                         drawn[key] = true
-                        DrawWorldIcon(worldMarkers, frame, nx, ny, 8, NodeIcon(node), 0.45)
+                        DrawWorldIcon(worldMarkers, frame, nx, ny, 7, NodeIcon(node), 0.32)
                     end
                 end
             end
@@ -522,7 +522,6 @@ function NodeTaxi:RedrawWorld()
     pathPoints = SmoothPath(pathPoints, 3)
 
     local pathColor = route.preview and COLORS.preview or COLORS.path
-    pathPoints = SmoothPath(pathPoints, 2)
 
     for i = 2, #pathPoints do
         local a, b = pathPoints[i - 1], pathPoints[i]

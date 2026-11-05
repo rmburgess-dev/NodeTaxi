@@ -21,8 +21,6 @@ local COLORS = {
     path = { 1.00, 0.82, 0.20, 0.92 },      -- taxi yellow
     pathFirst = { 1.00, 0.95, 0.65, 1.00 },
     preview = { 0.35, 0.90, 1.00, 0.95 },
-    cross = { 0.40, 0.78, 1.00, 0.35 },
-    crossPath = { 0.40, 0.78, 1.00, 0.65 },
     pathFuture = { 1.00, 0.93, 0.60, 0.85 },
     herb = { 0.30, 1.00, 0.45, 1.00 },
     ore = { 1.00, 0.62, 0.20, 1.00 },
@@ -447,21 +445,6 @@ function NodeTaxi:RedrawWorld()
         pathPoints = points
     end
 
-    -- Faint continuation through the following zones. When a full leg plan
-    -- exists we draw its nodes and path below; otherwise fall back to the
-    -- transition line only.
-    if route.crossPath and not route.preview and (not route.legs or #route.legs <= 1) then
-        local previous
-        for i = 2, #route.crossPath do
-            local point = route.crossPath[i]
-            local sx, sy = ToScreen(point.map, point.x, point.y)
-            if sx and previous then
-                DrawDashes(worldLines, frame, previous.x, previous.y, sx, sy, 6, 8, 1.5, COLORS.cross)
-            end
-            previous = sx and { x = sx, y = sy } or nil
-        end
-    end
-
     -- Future legs: draw only the node-to-node path built along the reference
     -- corridor. Node icons remain side-trip goals.
     if route.legs and #route.legs > 1 then
@@ -484,10 +467,6 @@ function NodeTaxi:RedrawWorld()
                     end
                 end
 
-                if legPoints[1] and previousExit then
-                    DrawDashes(worldLines, frame, previousExit.x, previousExit.y,
-                        legPoints[1].x, legPoints[1].y, 6, 8, 1.5, COLORS.cross)
-                end
                 for j = 2, #legPoints do
                     local a, b = legPoints[j - 1], legPoints[j]
                     DrawDashes(worldLines, frame, a.x, a.y, b.x, b.y, 6, 8, 1.5, COLORS.pathFuture)

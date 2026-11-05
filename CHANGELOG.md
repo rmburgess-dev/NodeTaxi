@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.10 - 2026-11-05
+
+- Remove the remaining blue transition/gap lines. The map now draws only the
+  node-to-node journey line and resource icons; no `crossPath` fallback or
+  inter-leg cyan dashes.
+
 ## 0.9.9 - 2026-11-05
 
 - Replace the straight out-and-back node spur with a smooth sweep: leave the

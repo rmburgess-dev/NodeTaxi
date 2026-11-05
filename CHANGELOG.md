@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.9 - 2026-11-05
+
+- Replace the straight out-and-back node spur with a smooth sweep: leave the
+  corridor at the node projection, curve through the selected node(s), and
+  rejoin the corridor at the next point ahead.
+- Keep the 75-yard deviation limit and the whole-map node field.
+
 ## 0.9.8 - 2026-11-05
 
 - Cap node deviations at 75 yards from the corridor by default. Nodes farther

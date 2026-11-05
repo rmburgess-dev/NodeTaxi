@@ -1501,9 +1501,9 @@ function NodeTaxi:BuildCorridorLeg(leg)
         return true
     end
 
-    -- Forward-only corridor traversal: follow the reference in order and
-    -- insert nodes at their projections once. Never return to a previous
-    -- projection or corridor vertex.
+    -- Smooth sweeps: leave the corridor at a node cluster's projection,
+    -- curve through the nodes in that segment, and rejoin the corridor at
+    -- the next point ahead. No straight return spur.
     local bySegment = {}
     for _, item in ipairs(selected) do
         local segment = item.projection.segment
@@ -1525,6 +1525,32 @@ function NodeTaxi:BuildCorridorLeg(leg)
         route[#route + 1] = { x = x, y = y, node = node }
     end
 
+    local function CatmullRom(points, steps)
+        local function at(index)
+            if index < 1 then
+                return points[1]
+            elseif index > #points then
+                return points[#points]
+            end
+            return points[index]
+        end
+        for index = 1, #points - 1 do
+            local p0, p1, p2, p3 = at(index - 1), at(index), at(index + 1), at(index + 2)
+            for step = 0, steps - 1 do
+                local t = step / steps
+                local t2, t3 = t * t, t * t * t
+                local x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t
+                    + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2
+                    + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3)
+                local y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t
+                    + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2
+                    + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+                Add(x, y)
+            end
+        end
+        Add(points[#points].x, points[#points].y)
+    end
+
     Add(leg.startX, leg.startY)
     if leg.corridorStart then
         Add(leg.corridorStart.x, leg.corridorStart.y)
@@ -1536,41 +1562,37 @@ function NodeTaxi:BuildCorridorLeg(leg)
     for i = 1, #corridor - 1 do
         local list = bySegment[i]
         if list then
-            local index = 1
-            while index <= #list do
-                local clusterEnd = index
-                while clusterEnd < #list
-                    and math.abs(list[clusterEnd + 1].projection.t - list[index].projection.t) <= 0.02 do
-                    clusterEnd = clusterEnd + 1
-                end
-
-                local remaining = {}
-                for j = index, clusterEnd do
-                    remaining[#remaining + 1] = list[j]
-                end
-                local projection = remaining[1].projection
-                Add(projection.x, projection.y)
-
-                while #remaining > 0 do
-                    local bestIndex, bestDistance = 1, math.huge
-                    for j, item in ipairs(remaining) do
-                        local dx, dy = item.node.x - currentX, item.node.y - currentY
-                        local distance = dx * dx + dy * dy
-                        if distance < bestDistance then
-                            bestIndex, bestDistance = j, distance
-                        end
-                    end
-                    local item = table.remove(remaining, bestIndex)
-                    Add(item.node.x, item.node.y, item.node)
-                    nodesOut[#nodesOut + 1] = item.node
-                    currentX, currentY = item.node.x, item.node.y
-                end
-                Add(projection.x, projection.y)
-                currentX, currentY = projection.x, projection.y
-                index = clusterEnd + 1
+            local remaining = {}
+            for j = 1, #list do
+                remaining[j] = list[j]
             end
+            local ordered = {}
+            while #remaining > 0 do
+                local bestIndex, bestDistance = 1, math.huge
+                for j, item in ipairs(remaining) do
+                    local dx, dy = item.node.x - currentX, item.node.y - currentY
+                    local distance = dx * dx + dy * dy
+                    if distance < bestDistance then
+                        bestIndex, bestDistance = j, distance
+                    end
+                end
+                local item = table.remove(remaining, bestIndex)
+                ordered[#ordered + 1] = item
+                nodesOut[#nodesOut + 1] = item.node
+                currentX, currentY = item.node.x, item.node.y
+            end
+
+            local sweep = { { x = list[1].projection.x, y = list[1].projection.y } }
+            for _, item in ipairs(ordered) do
+                sweep[#sweep + 1] = { x = item.node.x, y = item.node.y, node = item.node }
+            end
+            sweep[#sweep + 1] = { x = corridor[i + 1].x, y = corridor[i + 1].y }
+            CatmullRom(sweep, 6)
+            currentX, currentY = corridor[i + 1].x, corridor[i + 1].y
+        else
+            Add(corridor[i + 1].x, corridor[i + 1].y)
+            currentX, currentY = corridor[i + 1].x, corridor[i + 1].y
         end
-        Add(corridor[i + 1].x, corridor[i + 1].y)
     end
 
     if leg.corridorEnd then

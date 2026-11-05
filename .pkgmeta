@@ -1,0 +1,10 @@
+package-as: NodeTaxi
+
+ignore:
+  - .git
+  - .gitignore
+  - .pkgmeta
+  - dist
+  - docs
+  - tests
+  - tools

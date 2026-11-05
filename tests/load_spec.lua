@@ -611,8 +611,8 @@ check("Silverpine leg has a corridor spine", silverpineLeg and silverpineLeg.cor
     silverpineLeg and silverpineLeg.corridorPoints and #silverpineLeg.corridorPoints)
 check("corridor reference is real points", silverpineLeg and silverpineLeg.corridorPoints
     and silverpineLeg.corridorPoints[1].x ~= nil and silverpineLeg.corridorPoints[1].y ~= nil)
-check("visible path is one forward node chain", silverpineLeg and silverpineLeg.routePoints
-    and #silverpineLeg.routePoints == #silverpineLeg.nodes + 2,
+check("visible path follows the corridor through nodes", silverpineLeg and silverpineLeg.routePoints
+    and #silverpineLeg.routePoints > #silverpineLeg.nodes + 2,
     silverpineLeg and silverpineLeg.routePoints and #silverpineLeg.routePoints)
 local routeTouchesNode = false
 if silverpineLeg and silverpineLeg.routePoints and silverpineLeg.nodes[1] then

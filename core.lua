@@ -1499,101 +1499,93 @@ function NodeTaxi:BuildCorridorLeg(leg)
         return true
     end
 
-    -- Order same-progress nodes as a nearest-neighbour chain from the point
-    -- the route has reached. This prevents several nodes that project onto
-    -- the same corridor point from producing a star of spurs.
-    local ordered = {}
+    -- Forward-only corridor traversal: follow the reference in order and
+    -- insert nodes at their projections once. Never return to a previous
+    -- projection or corridor vertex.
+    local bySegment = {}
+    for _, item in ipairs(selected) do
+        local segment = item.projection.segment
+        bySegment[segment] = bySegment[segment] or {}
+        bySegment[segment][#bySegment[segment] + 1] = item
+    end
+    for _, list in pairs(bySegment) do
+        table.sort(list, function(a, b)
+            return a.projection.t < b.projection.t
+        end)
+    end
+
+    local route = {}
+    local function Add(x, y, node)
+        local previous = route[#route]
+        if previous and math.abs(previous.x - x) < 0.0001 and math.abs(previous.y - y) < 0.0001 then
+            return
+        end
+        route[#route + 1] = { x = x, y = y, node = node }
+    end
+
+    Add(leg.startX, leg.startY)
+    if leg.corridorStart then
+        Add(leg.corridorStart.x, leg.corridorStart.y)
+    end
+    Add(corridor[1].x, corridor[1].y)
     local currentX, currentY = corridor[1].x, corridor[1].y
-    local groupStart = 1
-    while groupStart <= #selected do
-        local groupEnd = groupStart
-        while groupEnd < #selected
-            and math.abs(selected[groupEnd + 1].projection.progress - selected[groupStart].projection.progress) <= 0.01 do
-            groupEnd = groupEnd + 1
-        end
 
-        local remaining = {}
-        for i = groupStart, groupEnd do
-            remaining[#remaining + 1] = selected[i]
-        end
-        while #remaining > 0 do
-            local bestIndex, bestDistance = 1, math.huge
-            for i, item in ipairs(remaining) do
-                local dx, dy = item.node.x - currentX, item.node.y - currentY
-                local distance = dx * dx + dy * dy
-                if distance < bestDistance then
-                    bestIndex, bestDistance = i, distance
+    local nodesOut = {}
+    for i = 1, #corridor - 1 do
+        local list = bySegment[i]
+        if list then
+            local index = 1
+            while index <= #list do
+                local clusterEnd = index
+                while clusterEnd < #list
+                    and math.abs(list[clusterEnd + 1].projection.t - list[index].projection.t) <= 0.02 do
+                    clusterEnd = clusterEnd + 1
                 end
-            end
-            local item = table.remove(remaining, bestIndex)
-            ordered[#ordered + 1] = item
-            currentX, currentY = item.node.x, item.node.y
-        end
-        groupStart = groupEnd + 1
-    end
 
-    -- The visible line is one chain. Start from corridor progress order,
-    -- then run a bounded 2-opt pass to remove crossings and long backtracks;
-    -- endpoints stay fixed.
-    local chain = { { x = leg.startX, y = leg.startY } }
-    for _, item in ipairs(ordered) do
-        chain[#chain + 1] = { x = item.node.x, y = item.node.y, node = item.node }
-    end
-    chain[#chain + 1] = { x = leg.destX, y = leg.destY }
-
-    local function chainLength(sequence)
-        local total = 0
-        for i = 2, #sequence do
-            local dx = sequence[i].x - sequence[i - 1].x
-            local dy = sequence[i].y - sequence[i - 1].y
-            total = total + math.sqrt(dx * dx + dy * dy)
-        end
-        return total
-    end
-
-    local function reverseRange(sequence, first, last)
-        while first < last do
-            sequence[first], sequence[last] = sequence[last], sequence[first]
-            first, last = first + 1, last - 1
-        end
-    end
-
-    local bestLength = chainLength(chain)
-    for _ = 1, 3 do
-        local improved = false
-        for first = 2, #chain - 2 do
-            for last = first + 1, #chain - 1 do
-                reverseRange(chain, first, last)
-                local candidateLength = chainLength(chain)
-                if candidateLength + 1e-9 < bestLength then
-                    bestLength = candidateLength
-                    improved = true
-                else
-                    reverseRange(chain, first, last)
+                local remaining = {}
+                for j = index, clusterEnd do
+                    remaining[#remaining + 1] = list[j]
                 end
+                local projection = remaining[1].projection
+                Add(projection.x, projection.y)
+
+                while #remaining > 0 do
+                    local bestIndex, bestDistance = 1, math.huge
+                    for j, item in ipairs(remaining) do
+                        local dx, dy = item.node.x - currentX, item.node.y - currentY
+                        local distance = dx * dx + dy * dy
+                        if distance < bestDistance then
+                            bestIndex, bestDistance = j, distance
+                        end
+                    end
+                    local item = table.remove(remaining, bestIndex)
+                    Add(item.node.x, item.node.y, item.node)
+                    nodesOut[#nodesOut + 1] = item.node
+                    currentX, currentY = item.node.x, item.node.y
+                end
+                index = clusterEnd + 1
             end
         end
-        if not improved then
-            break
-        end
+        Add(corridor[i + 1].x, corridor[i + 1].y)
     end
 
-    local length = bestLength
+    if leg.corridorEnd then
+        Add(leg.corridorEnd.x, leg.corridorEnd.y)
+    end
+    Add(leg.destX, leg.destY)
+
+    local length = 0
+    for i = 2, #route do
+        local dx, dy = route[i].x - route[i - 1].x, route[i].y - route[i - 1].y
+        length = length + math.sqrt(dx * dx + dy * dy)
+    end
     local ddx, ddy = leg.destX - leg.startX, leg.destY - leg.startY
     local direct = math.sqrt(ddx * ddx + ddy * ddy) * 1000
 
-    ordered = {}
-    for i = 2, #chain - 1 do
-        ordered[#ordered + 1] = { node = chain[i].node }
-    end
-    leg.routePoints = chain
-    leg.nodes = {}
-    for _, item in ipairs(ordered) do
-        leg.nodes[#leg.nodes + 1] = item.node
-    end
-    leg.routePoints = chain
+    leg.routePoints = route
+    leg.nodes = nodesOut
     leg.plan = {
-        nodes = leg.nodes,
+        nodes = nodesOut,
         length = length * 1000,
         direct = direct,
         inCorridor = #candidates,

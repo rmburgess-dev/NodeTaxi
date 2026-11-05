@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.7 - 2026-11-05
+
+- Follow the corridor forward between nodes instead of drawing straight
+  shortcuts. Each node is inserted once at its projection; the line never
+  returns to an earlier projection or corridor vertex.
+- Keep the whole-map node field from 0.9.6, including unexplored zones and
+  no-route browsing.
+- Remove the 2-opt shortcutting that was cutting across the reference.
+
 ## 0.9.6 - 2026-11-05
 
 - Show all known nodes for the whole displayed map, not only the current zone

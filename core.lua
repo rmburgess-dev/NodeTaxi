@@ -1573,72 +1573,137 @@ function NodeTaxi:BuildCorridorLeg(leg)
         end
         if startable then
             -- Enter at the earliest startable node, merge at the latest
-            -- corridor projection. 2-opt only the middle so the branch
-            -- cannot finish behind its entry.
+            -- corridor projection. For normal cluster sizes, solve the open
+            -- path exactly (Held-Karp) so the branch is the shortest possible
+            -- entry -> nodes -> merge walk instead of a 2-opt approximation.
             local merge = startable
             for _, candidate in ipairs(group) do
                 if candidate.projection.progress > merge.projection.progress then
                     merge = candidate
                 end
             end
-            local remaining = {}
+            local middle = {}
             for _, candidate in ipairs(group) do
                 if candidate ~= startable and candidate ~= merge then
-                    remaining[#remaining + 1] = candidate
+                    middle[#middle + 1] = candidate
                 end
             end
+
             local ordered = { startable }
-            local current = startable
-            while #remaining > 0 do
-                local best, bestIndex, bestDistance
-                for i, candidate in ipairs(remaining) do
-                    local distance = yardsBetween(current.node, candidate.node)
-                    if not bestDistance or distance < bestDistance then
-                        best, bestIndex, bestDistance = candidate, i, distance
-                    end
+            local n = #middle
+            if n > 0 and n <= 8 then
+                local size = 2 ^ n
+                local dp, prev = {}, {}
+                for mask = 0, size - 1 do
+                    dp[mask], prev[mask] = {}, {}
                 end
-                ordered[#ordered + 1] = best
-                table.remove(remaining, bestIndex)
-                current = best
-            end
-            if merge ~= startable then
-                ordered[#ordered + 1] = merge
-            end
-            if #ordered >= 3 then
-                local function orderLength()
-                    local total = 0
-                    for i = 2, #ordered do
-                        total = total + yardsBetween(ordered[i - 1].node, ordered[i].node)
-                    end
-                    return total
+                for j = 1, n do
+                    local mask = 2 ^ (j - 1)
+                    dp[mask][j] = yardsBetween(startable.node, middle[j].node)
                 end
-                local bestLength = orderLength()
-                for _ = 1, 3 do
-                    local improved = false
-                    for first = 2, #ordered - 2 do
-                        for last = first + 1, #ordered - 1 do
-                            local a, b = first, last
-                            while a < b do
-                                ordered[a], ordered[b] = ordered[b], ordered[a]
-                                a, b = a + 1, b - 1
-                            end
-                            local candidateLength = orderLength()
-                            if candidateLength + 1e-9 < bestLength then
-                                bestLength = candidateLength
-                                improved = true
-                            else
-                                a, b = first, last
-                                while a < b do
-                                    ordered[a], ordered[b] = ordered[b], ordered[a]
-                                    a, b = a + 1, b - 1
+                for mask = 1, size - 1 do
+                    for j = 1, n do
+                        local current = dp[mask][j]
+                        if current then
+                            for k = 1, n do
+                                if math.floor(mask / 2 ^ (k - 1)) % 2 == 0 then
+                                    local nextMask = mask + 2 ^ (k - 1)
+                                    local candidate = current + yardsBetween(middle[j].node, middle[k].node)
+                                    if not dp[nextMask][k] or candidate < dp[nextMask][k] then
+                                        dp[nextMask][k] = candidate
+                                        prev[nextMask][k] = j
+                                    end
                                 end
                             end
                         end
                     end
-                    if not improved then
-                        break
+                end
+                local full = size - 1
+                local bestLast, bestDistance
+                for j = 1, n do
+                    if dp[full][j] then
+                        local candidate = dp[full][j] + yardsBetween(middle[j].node, merge.node)
+                        if not bestDistance or candidate < bestDistance then
+                            bestLast, bestDistance = j, candidate
+                        end
                     end
                 end
+                if bestLast then
+                    local reverse = {}
+                    local mask, j = full, bestLast
+                    while j do
+                        reverse[#reverse + 1] = middle[j]
+                        local previous = prev[mask][j]
+                        mask = mask - 2 ^ (j - 1)
+                        j = previous
+                    end
+                    for i = #reverse, 1, -1 do
+                        ordered[#ordered + 1] = reverse[i]
+                    end
+                else
+                    for _, candidate in ipairs(middle) do
+                        ordered[#ordered + 1] = candidate
+                    end
+                end
+            else
+                -- Large cluster fallback: nearest-neighbour, then 2-opt the
+                -- middle with entry/merge pinned.
+                local remaining = {}
+                for _, candidate in ipairs(middle) do
+                    remaining[#remaining + 1] = candidate
+                end
+                local current = startable
+                while #remaining > 0 do
+                    local best, bestIndex, bestDistance
+                    for i, candidate in ipairs(remaining) do
+                        local distance = yardsBetween(current.node, candidate.node)
+                        if not bestDistance or distance < bestDistance then
+                            best, bestIndex, bestDistance = candidate, i, distance
+                        end
+                    end
+                    ordered[#ordered + 1] = best
+                    table.remove(remaining, bestIndex)
+                    current = best
+                end
+                if #ordered >= 3 then
+                    local function orderLength()
+                        local total = 0
+                        for i = 2, #ordered do
+                            total = total + yardsBetween(ordered[i - 1].node, ordered[i].node)
+                        end
+                        return total
+                    end
+                    local bestLength = orderLength()
+                    for _ = 1, 3 do
+                        local improved = false
+                        for first = 2, #ordered - 2 do
+                            for last = first + 1, #ordered - 1 do
+                                local a, b = first, last
+                                while a < b do
+                                    ordered[a], ordered[b] = ordered[b], ordered[a]
+                                    a, b = a + 1, b - 1
+                                end
+                                local candidateLength = orderLength()
+                                if candidateLength + 1e-9 < bestLength then
+                                    bestLength = candidateLength
+                                    improved = true
+                                else
+                                    a, b = first, last
+                                    while a < b do
+                                        ordered[a], ordered[b] = ordered[b], ordered[a]
+                                        a, b = a + 1, b - 1
+                                    end
+                                end
+                            end
+                        end
+                        if not improved then
+                            break
+                        end
+                    end
+                end
+            end
+            if merge ~= startable then
+                ordered[#ordered + 1] = merge
             end
 
             local maxProgress = merge.projection.progress

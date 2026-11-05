@@ -2,7 +2,7 @@
 ## Title: NodeTaxi
 ## Notes: Tracking-aware gathering routes for WoW Forever, with hidden corridor references and dashed node-to-node journey lines. Draws a dashed taxi path through herb/ore nodes between you and your TomTom waypoint, without modifying TomTom.
 ## Author: rmburgess-dev
-## Version: 0.9.21
+## Version: 0.9.22
 ## SavedVariables: NodeTaxiDB
 ## Dependencies: TomTom
 ## IconTexture: Interface\Icons\INV_Misc_Map_01

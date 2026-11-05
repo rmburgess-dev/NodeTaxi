@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.22 - 2026-11-05
+
+- Solve each normal-sized cluster as an exact open path (Held-Karp) from its
+  entry node through the cluster to its forward merge point. This replaces the
+  nearest-neighbour/2-opt approximation for clusters of up to 8 nodes.
+- Large clusters keep the bounded heuristic to avoid exponential work.
+- The exact order preserves the forward merge endpoint, so branches still
+  cannot loop back behind their entry.
+
 ## 0.9.21 - 2026-11-05
 
 - Remove duplicate Catmull-Rom smoothing of the world route line.

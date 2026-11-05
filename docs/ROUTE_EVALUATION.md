@@ -37,7 +37,9 @@ For Elwynn Forest from Tirisfal:
 The 8 default is the best fit for “known path with little journeys.” Users who
 want denser coverage can raise it explicitly. A 0.9.20 visual pass also rejected
 a distance-only cluster ordering that produced more back-and-forth; the merge
-point is now pinned forward.
+point is now pinned forward. 0.9.22 solves the normal-sized cluster order
+exactly (entry → nodes → merge), with the bounded heuristic only for large
+clusters.
 
 ## Rolling stability
 

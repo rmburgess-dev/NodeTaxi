@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.15 - 2026-11-05
+
+- Replace first-come branch selection with cluster scoring: nodes within the
+  100-yard branch radius form clusters, ranked by node density versus corridor
+  span.
+- 2-opt each cluster's internal node order.
+- Skip clusters whose corridor span overlaps an already selected cluster, so
+  the route never backtracks along the corridor to reach a newer cluster.
+- The per-zone `/nt max` cap still applies; raise it for dense fields.
+
 ## 0.9.14 - 2026-11-05
 
 - Fix the branch pool: once a branch starts near the corridor, every unvisited

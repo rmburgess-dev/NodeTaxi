@@ -1495,68 +1495,193 @@ function NodeTaxi:BuildCorridorLeg(leg)
         return a.projection.progress < b.projection.progress
     end)
 
-    -- Branch walk: start at the first unvisited node along the corridor,
-    -- then keep taking the nearest unvisited node within `neighborYards` of
-    -- the one just reached. When no neighbour remains, merge back to the
-    -- furthest corridor progress reached by the branch and continue.
-    local used = {}
-    local branches = {}
-    local selectedCount = 0
-    local cursorProgress = 0
-
-    while selectedCount < settings.maxNodes do
-        local startIndex
-        for i = 1, #candidates do
-            if not used[i]
-                and candidates[i].offsetYards <= maxOffset
-                and candidates[i].projection.progress >= cursorProgress - 1e-9 then
-                startIndex = i
-                break
+    -- Cluster first, then score. Nodes within the branch radius form one
+    -- cluster; a cluster can start only if at least one member is within the
+    -- corridor deviation limit. Clusters are ranked by density/span so an
+    -- early sparse cluster cannot consume the node budget before a dense one.
+    local parent = {}
+    local function find(i)
+        while parent[i] ~= i do
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        end
+        return i
+    end
+    local function union(a, b)
+        local ra, rb = find(a), find(b)
+        if ra ~= rb then
+            parent[rb] = ra
+        end
+    end
+    for i = 1, #candidates do
+        parent[i] = i
+    end
+    for i = 1, #candidates do
+        for j = i + 1, #candidates do
+            if yardsBetween(candidates[i].node, candidates[j].node) <= neighborYards then
+                union(i, j)
             end
         end
-        if not startIndex then
-            break
+    end
+
+    local groups = {}
+    for i = 1, #candidates do
+        local root = find(i)
+        groups[root] = groups[root] or {}
+        groups[root][#groups[root] + 1] = candidates[i]
+    end
+
+    local clusters = {}
+    for _, group in pairs(groups) do
+        local startable
+        for _, candidate in ipairs(group) do
+            if candidate.offsetYards <= maxOffset then
+                if not startable or candidate.projection.progress < startable.projection.progress then
+                    startable = candidate
+                end
+            end
         end
+        if startable then
+            local remaining = {}
+            for _, candidate in ipairs(group) do
+                remaining[#remaining + 1] = candidate
+            end
+            local ordered = {}
+            local current = startable
+            while current do
+                ordered[#ordered + 1] = current
+                local index
+                for i, candidate in ipairs(remaining) do
+                    if candidate == current then
+                        index = i
+                        break
+                    end
+                end
+                if index then
+                    table.remove(remaining, index)
+                end
+                local best, bestDistance
+                for _, candidate in ipairs(remaining) do
+                    local distance = yardsBetween(current.node, candidate.node)
+                    if not bestDistance or distance < bestDistance then
+                        best, bestDistance = candidate, distance
+                    end
+                end
+                current = best
+            end
 
-        local branch = {}
-        local first = candidates[startIndex]
-        used[startIndex] = true
-        branch[#branch + 1] = first
-        selectedCount = selectedCount + 1
-        local current = first
-        local maxProgress = first.projection.progress
-
-        while selectedCount < settings.maxNodes do
-            local bestIndex, bestDistance
-            for i = 1, #candidates do
-                if not used[i] then
-                    local distance = yardsBetween(current.node, candidates[i].node)
-                    if distance <= neighborYards and (not bestDistance or distance < bestDistance) then
-                        bestIndex, bestDistance = i, distance
+            -- 2-opt the local cluster order (entry stays first). This keeps
+            -- the branch from zig-zagging between nodes in a dense field.
+            if #ordered >= 3 then
+                local function orderLength()
+                    local total = 0
+                    for i = 2, #ordered do
+                        total = total + yardsBetween(ordered[i - 1].node, ordered[i].node)
+                    end
+                    return total
+                end
+                local bestLength = orderLength()
+                for _ = 1, 3 do
+                    local improved = false
+                    for first = 2, #ordered - 1 do
+                        for last = first + 1, #ordered do
+                            local a, b = first, last
+                            while a < b do
+                                ordered[a], ordered[b] = ordered[b], ordered[a]
+                                a, b = a + 1, b - 1
+                            end
+                            local candidateLength = orderLength()
+                            if candidateLength + 1e-9 < bestLength then
+                                bestLength = candidateLength
+                                improved = true
+                            else
+                                a, b = first, last
+                                while a < b do
+                                    ordered[a], ordered[b] = ordered[b], ordered[a]
+                                    a, b = a + 1, b - 1
+                                end
+                            end
+                        end
+                    end
+                    if not improved then
+                        break
                     end
                 end
             end
-            if not bestIndex then
+
+            local maxProgress = startable.projection.progress
+            for _, candidate in ipairs(group) do
+                if candidate.projection.progress > maxProgress then
+                    maxProgress = candidate.projection.progress
+                end
+            end
+            local span = math.max(0, maxProgress - startable.projection.progress)
+            clusters[#clusters + 1] = {
+                entryProgress = startable.projection.progress,
+                mergeProgress = maxProgress,
+                nodes = ordered,
+                score = #group / (1 + span * 1000),
+            }
+        end
+    end
+
+    table.sort(clusters, function(a, b)
+        if a.score == b.score then
+            return a.entryProgress < b.entryProgress
+        end
+        return a.score > b.score
+    end)
+
+    local branches = {}
+    local selectedCount = 0
+    local selectedClusters = {}
+    for _, cluster in ipairs(clusters) do
+        if selectedCount >= settings.maxNodes then
+            break
+        end
+        local overlaps = false
+        for _, other in ipairs(selectedClusters) do
+            if cluster.entryProgress < other.mergeProgress
+                and cluster.mergeProgress > other.entryProgress then
+                overlaps = true
                 break
             end
-            local nextNode = candidates[bestIndex]
-            used[bestIndex] = true
-            branch[#branch + 1] = nextNode
-            selectedCount = selectedCount + 1
-            current = nextNode
-            if nextNode.projection.progress > maxProgress then
-                maxProgress = nextNode.projection.progress
+        end
+        if overlaps then
+            -- Keep the route forward; skip a cluster whose corridor span
+            -- overlaps one already selected.
+        else
+        local take = {}
+        local slots = settings.maxNodes - selectedCount
+        for _, candidate in ipairs(cluster.nodes) do
+            if #take < slots then
+                take[#take + 1] = candidate
             end
         end
-
-        maxProgress = math.max(cursorProgress, maxProgress)
-        branches[#branches + 1] = {
-            entryProgress = first.projection.progress,
-            mergeProgress = maxProgress,
-            nodes = branch,
-        }
-        cursorProgress = maxProgress
+        if #take > 0 then
+            local mergeProgress = take[1].projection.progress
+            for _, candidate in ipairs(take) do
+                if candidate.projection.progress > mergeProgress then
+                    mergeProgress = candidate.projection.progress
+                end
+            end
+            branches[#branches + 1] = {
+                entryProgress = take[1].projection.progress,
+                mergeProgress = mergeProgress,
+                nodes = take,
+            }
+            selectedCount = selectedCount + #take
+            selectedClusters[#selectedClusters + 1] = {
+                entryProgress = take[1].projection.progress,
+                mergeProgress = mergeProgress,
+            }
+        end
+        end
     end
+
+    table.sort(branches, function(a, b)
+        return a.entryProgress < b.entryProgress
+    end)
 
     local nodesOut = {}
     for _, branch in ipairs(branches) do

@@ -1315,6 +1315,97 @@ function NodeTaxi:RecordZoneTransition()
     end
 end
 
+--[[ Corridor backbones -----------------------------------------------------
+    Compact entrance->exit walking routes generated offline from the SPF
+    navigation maps. They are not the navmesh: each zone stores only its
+    connection endpoints and the polylines between them.
+--------------------------------------------------------------------------]]
+local function CorridorKey(x, y)
+    return string.format("%.4f,%.4f", x, y)
+end
+
+local function UnpackCorridor(flat)
+    local points = {}
+    for i = 1, #flat, 2 do
+        points[#points + 1] = { x = flat[i], y = flat[i + 1] }
+    end
+    return points
+end
+
+local function NearestCorridorEndpoint(zone, x, y)
+    local best, bestDistance
+    for _, endpoint in ipairs(zone.endpoints or {}) do
+        local dx, dy = endpoint.x - x, endpoint.y - y
+        local distance = dx * dx + dy * dy
+        if not bestDistance or distance < bestDistance then
+            best, bestDistance = endpoint, distance
+        end
+    end
+    return best, bestDistance
+end
+
+function NodeTaxi:FindCorridor(mapID, fromX, fromY, toX, toY)
+    local data = ns.CorridorData and ns.CorridorData.zones[mapID]
+    if not (data and data.paths and data.endpoints) then
+        return nil
+    end
+
+    local fromKey = CorridorKey(fromX, fromY)
+    local toKey = CorridorKey(toX, toY)
+    local flat = data.paths[fromKey .. "|" .. toKey]
+    if flat then
+        return UnpackCorridor(flat), { x = fromX, y = fromY }, { x = toX, y = toY }, true, true
+    end
+
+    -- First and last legs usually start or end somewhere inside the zone,
+    -- not on a Carbonite connection. Use the nearest published endpoint and
+    -- let the caller draw a short connector.
+    local fromEndpoint, fromDistance = NearestCorridorEndpoint(data, fromX, fromY)
+    local toEndpoint, toDistance = NearestCorridorEndpoint(data, toX, toY)
+    if not (fromEndpoint and toEndpoint) then
+        return nil
+    end
+    -- Do not attach a corridor through a long invented connector.
+    if fromDistance > 0.04 or toDistance > 0.04 then
+        return nil
+    end
+    if fromEndpoint.key == toEndpoint.key then
+        return nil
+    end
+
+    flat = data.paths[fromEndpoint.key .. "|" .. toEndpoint.key]
+    if not flat then
+        return nil
+    end
+    return UnpackCorridor(flat),
+        { x = fromEndpoint.x, y = fromEndpoint.y, key = fromEndpoint.key },
+        { x = toEndpoint.x, y = toEndpoint.y, key = toEndpoint.key },
+        false, false
+end
+
+function NodeTaxi:AttachCorridors(legs)
+    local attached = 0
+    for i, leg in ipairs(legs) do
+        local path, startPoint, endPoint, exactStart, exactEnd = self:FindCorridor(
+            leg.map, leg.startX, leg.startY, leg.destX, leg.destY)
+        if path then
+            leg.corridorPoints = path
+            leg.corridorStart = startPoint
+            leg.corridorEnd = endPoint
+            leg.corridorExactStart = exactStart
+            leg.corridorExactEnd = exactEnd
+            if i == 1 and not exactStart then
+                leg.corridorConnectorStart = true
+            end
+            if i == #legs and not exactEnd then
+                leg.corridorConnectorEnd = true
+            end
+            attached = attached + 1
+        end
+    end
+    return attached
+end
+
 function NodeTaxi:BuildRoute(announce)
     InitSettingsIfNeeded()
 
@@ -1511,6 +1602,12 @@ function NodeTaxi:BuildRoute(announce)
     local totalNodes = 0
     for i = 1, #legs do
         totalNodes = totalNodes + #(legs[i].nodes or {})
+    end
+
+    local corridorLegs = 0
+    if cross then
+        corridorLegs = self:AttachCorridors(legs)
+        cross.corridorLegs = corridorLegs
     end
 
     local routeDest

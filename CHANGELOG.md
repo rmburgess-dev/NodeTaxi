@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.0 - 2026-11-05
+
+- Add `corridors.lua`: 121 compact zone entrance→exit walking backbones
+  generated offline from Shortest Path Forever's public navigation maps.
+- Replace straight node-to-node lines on the world map and minimap with the
+  corridor spine. Nodes remain side-trip icons; they are no longer joined.
+- Use the nearest published endpoint with a short connector for the first and
+  last leg; no runtime navmesh and no 12 MB dependency.
+- Corridor data is GPLv3 and attributed separately from the MIT code.
+
 ## 0.8.0 - 2026-11-04
 
 - Plan and display resource nodes for **every zone** on a cross-zone route,

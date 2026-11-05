@@ -48,6 +48,19 @@ land crossings, portals, boats, zeppelins and the tram. NodeTaxi uses those
 points directly, converts the 0..100 zone percentages to normalised map
 coordinates, and prefers land connections when choosing a route.
 
+## Zone corridor polylines
+
+`corridors.lua` is generated offline from the public navigation maps of
+Shortest Path Forever:
+
+- Shortest Path Forever by Cillian Berragan and contributors
+- https://github.com/cjber/shortest-path-forever
+- GPL-3.0-or-later
+- The navmesh itself is **not** included; only derived entrance-to-exit
+  walking polylines are shipped.
+
+`corridors.lua` is distributed under GPLv3, not MIT; see LICENSE.
+
 ## Resource artwork
 
 The per-node art in `Media/` (copper, tin, peacebloom, ...) comes from

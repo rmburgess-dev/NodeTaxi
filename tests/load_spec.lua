@@ -204,6 +204,7 @@ local function loadAddonFile(path)
 end
 
 loadAddonFile("transitions.lua")
+loadAddonFile("corridors.lua")
 loadAddonFile("route.lua")
 loadAddonFile("core.lua")
 loadAddonFile("overlay.lua")
@@ -597,6 +598,18 @@ check("future leg nodes are included", bakedRoute and bakedRoute.totalNodes
 local silverpineLeg = bakedRoute and bakedRoute.legs and bakedRoute.legs[2]
 check("Silverpine leg carries its node", silverpineLeg and #silverpineLeg.nodes >= 1,
     silverpineLeg and #silverpineLeg.nodes)
+check("corridor data loaded", ADDON.CorridorData and ADDON.CorridorData.zones
+    and ADDON.CorridorData.zones[1421] ~= nil)
+check("Silverpine leg has a corridor spine", silverpineLeg and silverpineLeg.corridorPoints
+    and #silverpineLeg.corridorPoints >= 2,
+    silverpineLeg and silverpineLeg.corridorPoints and #silverpineLeg.corridorPoints)
+check("corridor spine is real points", silverpineLeg and silverpineLeg.corridorPoints
+    and silverpineLeg.corridorPoints[1].x ~= nil and silverpineLeg.corridorPoints[1].y ~= nil)
+local corridorLegs = 0
+for _, leg in ipairs(bakedRoute and bakedRoute.legs or {}) do
+    if leg.corridorPoints then corridorLegs = corridorLegs + 1 end
+end
+check("several legs use corridor backbones", corridorLegs >= 5, corridorLegs)
 
 -- 1. Learn a crossing from an actual zone change.
 playerZoneMap = 1420

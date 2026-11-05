@@ -400,6 +400,37 @@ function NodeTaxi:RedrawWorld()
         end
     end
 
+    -- Build the drawn path separately from the node markers. With a corridor
+    -- backbone, the nodes are destinations you can leave the road for; they
+    -- are no longer connected to each other by straight lines.
+    local pathPoints = {}
+    local currentLeg = route.legs and route.legs[1]
+    if currentLeg and currentLeg.corridorPoints then
+        if points[1] and points[1].live then
+            pathPoints[#pathPoints + 1] = points[1]
+        end
+        if currentLeg.corridorStart then
+            local sx, sy = ToScreen(currentLeg.map, currentLeg.corridorStart.x, currentLeg.corridorStart.y)
+            if sx then
+                pathPoints[#pathPoints + 1] = { x = sx, y = sy }
+            end
+        end
+        for _, corridorPoint in ipairs(currentLeg.corridorPoints) do
+            local sx, sy = ToScreen(currentLeg.map, corridorPoint.x, corridorPoint.y)
+            if sx then
+                pathPoints[#pathPoints + 1] = { x = sx, y = sy }
+            end
+        end
+        if currentLeg.corridorConnectorEnd and route.dest then
+            local ex, ey = ToScreen(route.dest.map, route.dest.x, route.dest.y)
+            if ex then
+                pathPoints[#pathPoints + 1] = { x = ex, y = ey }
+            end
+        end
+    elseif not route.cross then
+        pathPoints = points
+    end
+
     -- Faint continuation through the following zones. When a full leg plan
     -- exists we draw its nodes and path below; otherwise fall back to the
     -- transition line only.
@@ -415,7 +446,7 @@ function NodeTaxi:RedrawWorld()
         end
     end
 
-    -- Future legs: their selected nodes and dashed path across each zone.
+    -- Future legs: corridor spine only. Node icons stay as side-trip goals.
     if route.legs and #route.legs > 1 then
         local previousExit
         if route.dest then
@@ -427,42 +458,59 @@ function NodeTaxi:RedrawWorld()
 
         for i = 2, #route.legs do
             local leg = route.legs[i]
-            local startX, startY = ToScreen(leg.map, leg.startX, leg.startY)
-            if startX and previousExit then
-                DrawDashes(worldLines, frame, previousExit.x, previousExit.y,
-                    startX, startY, 6, 8, 1.5, COLORS.cross)
-            end
+            if leg.corridorPoints then
+                local corridorStart = leg.corridorStart or { x = leg.startX, y = leg.startY }
+                local startX, startY = ToScreen(leg.map, corridorStart.x, corridorStart.y)
+                if startX and previousExit then
+                    DrawDashes(worldLines, frame, previousExit.x, previousExit.y,
+                        startX, startY, 6, 8, 1.5, COLORS.cross)
+                end
 
-            local legPoints = {}
-            if startX then
-                legPoints[#legPoints + 1] = { x = startX, y = startY }
+                local legPoints = {}
+                if startX then
+                    legPoints[#legPoints + 1] = { x = startX, y = startY }
+                end
+                for _, corridorPoint in ipairs(leg.corridorPoints) do
+                    local sx, sy = ToScreen(leg.map, corridorPoint.x, corridorPoint.y)
+                    if sx then
+                        legPoints[#legPoints + 1] = { x = sx, y = sy }
+                    end
+                end
+
+                local corridorEnd = leg.corridorEnd or { x = leg.destX, y = leg.destY }
+                local endX, endY = ToScreen(leg.map, corridorEnd.x, corridorEnd.y)
+                if endX then
+                    legPoints[#legPoints + 1] = { x = endX, y = endY }
+                end
+                for j = 2, #legPoints do
+                    local a, b = legPoints[j - 1], legPoints[j]
+                    DrawDashes(worldLines, frame, a.x, a.y, b.x, b.y, 6, 8, 1.5, COLORS.crossPath)
+                end
+
+                if leg.corridorConnectorEnd then
+                    local dx, dy = ToScreen(leg.map, leg.destX, leg.destY)
+                    if endX and dx then
+                        DrawDashes(worldLines, frame, endX, endY, dx, dy, 6, 8, 1.5, COLORS.cross)
+                    end
+                end
+                previousExit = endX and { x = endX, y = endY } or nil
+            else
+                local dx, dy = ToScreen(leg.map, leg.destX, leg.destY)
+                previousExit = dx and { x = dx, y = dy } or nil
             end
 
             for _, node in ipairs(leg.nodes or {}) do
                 local nx, ny = ToScreen(leg.map, node.x, node.y)
                 if nx then
-                    legPoints[#legPoints + 1] = { x = nx, y = ny }
                     DrawWorldIcon(worldMarkers, frame, nx, ny, 10, NodeIcon(node), 0.85)
                 end
             end
-
-            local endX, endY = ToScreen(leg.map, leg.destX, leg.destY)
-            if endX then
-                legPoints[#legPoints + 1] = { x = endX, y = endY }
-            end
-
-            for j = 2, #legPoints do
-                local a, b = legPoints[j - 1], legPoints[j]
-                DrawDashes(worldLines, frame, a.x, a.y, b.x, b.y, 6, 8, 1.5, COLORS.crossPath)
-            end
-
-            previousExit = endX and { x = endX, y = endY } or nil
         end
     end
 
     local pathColor = route.preview and COLORS.preview or COLORS.path
-    for i = 2, #points do
-        local a, b = points[i - 1], points[i]
+    for i = 2, #pathPoints do
+        local a, b = pathPoints[i - 1], pathPoints[i]
         local color = pathColor
         local thickness = 2
         if i == 2 and a.live then
@@ -610,6 +658,34 @@ function NodeTaxi:RedrawMinimap()
         end
     end
 
+    -- Path points are separate from the node markers: corridor backbones
+    -- replace straight node-to-node lines.
+    local pathPoints = {}
+    local currentLeg = route.legs and route.legs[1]
+    if currentLeg and currentLeg.corridorPoints then
+        if points[1] and points[1].live then
+            pathPoints[#pathPoints + 1] = points[1]
+        end
+        local function AddCorridorPoint(mapID, x, y)
+            local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone, hbd, x, y, mapID)
+            if worldOk and wx and instance == playerInstance then
+                local u, v = ToMinimap(wx, wy)
+                pathPoints[#pathPoints + 1] = { x = u, y = v }
+            end
+        end
+        if currentLeg.corridorStart then
+            AddCorridorPoint(currentLeg.map, currentLeg.corridorStart.x, currentLeg.corridorStart.y)
+        end
+        for _, corridorPoint in ipairs(currentLeg.corridorPoints) do
+            AddCorridorPoint(currentLeg.map, corridorPoint.x, corridorPoint.y)
+        end
+        if currentLeg.corridorConnectorEnd and route.dest then
+            AddCorridorPoint(route.dest.map, route.dest.x, route.dest.y)
+        end
+    elseif not route.cross then
+        pathPoints = points
+    end
+
     local lineSet = minimapLines
     local parent = frame
     local mask = GetMinimapMask()
@@ -644,8 +720,8 @@ function NodeTaxi:RedrawMinimap()
         end
     end
 
-    for i = 2, #points do
-        local a, b = points[i - 1], points[i]
+    for i = 2, #pathPoints do
+        local a, b = pathPoints[i - 1], pathPoints[i]
         local color = pathColor
         if i == 2 and a.live then
             color = route.preview and COLORS.preview or COLORS.pathFirst

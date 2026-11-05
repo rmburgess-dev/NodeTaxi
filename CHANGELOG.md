@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.2 - 2026-11-05
+
+- Fix the radial "star" around nodes that shared one corridor projection:
+  the route now walks the corridor once and chains same-progress nodes
+  directly node-to-node.
+- Make all visible journey legs the same taxi-yellow dashed style; later legs
+  are dimmed instead of switching to cyan.
+- Keep the corridor itself hidden; only the node-to-node line is drawn.
+
 ## 0.9.1 - 2026-11-05
 
 - Keep the original dashed node-to-node taxi line. The corridor is now only

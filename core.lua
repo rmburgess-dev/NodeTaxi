@@ -1461,16 +1461,37 @@ function NodeTaxi:BuildCorridorLeg(leg)
         return true
     end
 
-    local events = {}
-    for _, item in ipairs(selected) do
-        local segment = item.projection.segment
-        events[segment] = events[segment] or {}
-        events[segment][#events[segment] + 1] = item
-    end
-    for _, list in pairs(events) do
-        table.sort(list, function(a, b)
-            return a.projection.t < b.projection.t
-        end)
+    -- Order same-progress nodes as a nearest-neighbour chain from the point
+    -- the route has reached. This prevents several nodes that project onto
+    -- the same corridor point from producing a star of spurs.
+    local ordered = {}
+    local currentX, currentY = corridor[1].x, corridor[1].y
+    local groupStart = 1
+    while groupStart <= #selected do
+        local groupEnd = groupStart
+        while groupEnd < #selected
+            and math.abs(selected[groupEnd + 1].projection.progress - selected[groupStart].projection.progress) <= 0.01 do
+            groupEnd = groupEnd + 1
+        end
+
+        local remaining = {}
+        for i = groupStart, groupEnd do
+            remaining[#remaining + 1] = selected[i]
+        end
+        while #remaining > 0 do
+            local bestIndex, bestDistance = 1, math.huge
+            for i, item in ipairs(remaining) do
+                local dx, dy = item.node.x - currentX, item.node.y - currentY
+                local distance = dx * dx + dy * dy
+                if distance < bestDistance then
+                    bestIndex, bestDistance = i, distance
+                end
+            end
+            local item = table.remove(remaining, bestIndex)
+            ordered[#ordered + 1] = item
+            currentX, currentY = item.node.x, item.node.y
+        end
+        groupStart = groupEnd + 1
     end
 
     local route = {}
@@ -1488,12 +1509,26 @@ function NodeTaxi:BuildCorridorLeg(leg)
     end
     Add(corridor[1].x, corridor[1].y)
 
-    for i = 1, #corridor - 1 do
-        for _, item in ipairs(events[i] or {}) do
-            Add(item.projection.x, item.projection.y)
-            Add(item.node.x, item.node.y)
+    local lastSegment, lastProgress = 1, 0
+    for _, item in ipairs(ordered) do
+        local projection = item.projection
+        if projection.progress > lastProgress + 0.001 then
+            local segment = lastSegment
+            while segment < projection.segment do
+                Add(corridor[segment + 1].x, corridor[segment + 1].y)
+                segment = segment + 1
+            end
+            Add(projection.x, projection.y)
+            lastSegment = projection.segment
+            lastProgress = projection.progress
         end
-        Add(corridor[i + 1].x, corridor[i + 1].y)
+        Add(item.node.x, item.node.y)
+    end
+
+    local segment = lastSegment
+    while segment < #corridor do
+        Add(corridor[segment + 1].x, corridor[segment + 1].y)
+        segment = segment + 1
     end
 
     if leg.corridorEnd then
@@ -1510,7 +1545,7 @@ function NodeTaxi:BuildCorridorLeg(leg)
     local direct = math.sqrt(ddx * ddx + ddy * ddy) * 1000
 
     leg.nodes = {}
-    for _, item in ipairs(selected) do
+    for _, item in ipairs(ordered) do
         leg.nodes[#leg.nodes + 1] = item.node
     end
     leg.routePoints = route

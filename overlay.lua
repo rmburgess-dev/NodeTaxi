@@ -23,6 +23,7 @@ local COLORS = {
     preview = { 0.35, 0.90, 1.00, 0.95 },
     cross = { 0.40, 0.78, 1.00, 0.35 },
     crossPath = { 0.40, 0.78, 1.00, 0.65 },
+    pathFuture = { 1.00, 0.93, 0.60, 0.85 },
     herb = { 0.30, 1.00, 0.45, 1.00 },
     ore = { 1.00, 0.62, 0.20, 1.00 },
     manual = { 0.90, 0.90, 0.95, 1.00 },
@@ -458,7 +459,7 @@ function NodeTaxi:RedrawWorld()
                 end
                 for j = 2, #legPoints do
                     local a, b = legPoints[j - 1], legPoints[j]
-                    DrawDashes(worldLines, frame, a.x, a.y, b.x, b.y, 6, 8, 1.5, COLORS.crossPath)
+                    DrawDashes(worldLines, frame, a.x, a.y, b.x, b.y, 6, 8, 1.5, COLORS.pathFuture)
                 end
                 previousExit = legPoints[#legPoints] or previousExit
             else

@@ -279,7 +279,7 @@ local function InitDB()
     NodeTaxiDB = NodeTaxiDB or {}
     db = NodeTaxiDB
     local oldVersion = db.version or 1
-    db.version = 2
+    db.version = 3
 
     db.settings = db.settings or {}
     for key, value in pairs(DEFAULTS) do
@@ -295,6 +295,7 @@ local function InitDB()
     end
 
     db.nodes = db.nodes or {}
+    db.transitions = db.transitions or {}
     db.log = db.log or {}
     while #db.log > LOG_LIMIT do
         table.remove(db.log, 1)
@@ -305,6 +306,7 @@ local function InitDB()
     settings = db.settings
     NodeTaxi.db = db
     NodeTaxi.settings = settings
+    NodeTaxi.mapLinkCache = {}
 end
 
 local function InitSettingsIfNeeded()
@@ -360,11 +362,15 @@ local function FormatLogEntry(entry)
         return string.format("%s validate herb=%s ore=%s stored=%s at %s",
             clock, FormatDistance(entry.herb), FormatDistance(entry.ore),
             FormatDistance(entry.stored), CoordText(entry.x, entry.y))
+    elseif event == "crossing" then
+        return string.format("%s crossing %s %s -> %s %s (%.0f yd)",
+            clock, tostring(entry.from), CoordText(entry.fromX, entry.fromY),
+            tostring(entry.to), CoordText(entry.toX, entry.toY), entry.distance or 0)
     elseif event == "route" then
         return string.format("%s route %d node(s) len=%.0f direct=%.0f target=%s cross=%s%s",
             clock, entry.nodes or 0, entry.len or 0, entry.direct or 0,
             CoordText(entry.tx, entry.ty), tostring(entry.cross or 0),
-            entry.fallback and " fallback" or "")
+            entry.source and (" " .. tostring(entry.source)) or "")
     elseif event == "session" then
         return string.format("%s session v%s build=%s seed=%s (%s nodes)",
             clock, tostring(entry.v), tostring(entry.build), tostring(entry.seed),
@@ -989,11 +995,13 @@ function NodeTaxi:Redraw()
     end
 end
 
---[[ Cross-zone legs ---------------------------------------------------------
-    A route to another zone is built one leg at a time: find the border you
-    should cross, route through the nodes in this zone to that exit, and rebuild
-    from the new zone when the player crosses. The full zone path is kept for a
-    dim continuation line on the world map.
+--[[ Real zone transitions -------------------------------------------------
+    A crossing is only used if its point is real:
+      * learned from an actual player zone change (both sides recorded), or
+      * a client map link (C_Map.GetMapLinksForMap) whose pin points at
+        another zone.
+    There is deliberately no geometric border/rectangle fallback. A map edge
+    is not a pass, and sending someone at a mountain is worse than not routing.
 ----------------------------------------------------------------------------]]
 local function GetMapInfoRaw(mapID)
     if not (C_Map and C_Map.GetMapInfo) then
@@ -1006,233 +1014,221 @@ local function GetMapInfoRaw(mapID)
     return nil
 end
 
-local function GetMapRectRaw(mapID, topMapID)
-    if not (C_Map and C_Map.GetMapRectOnMap) then
-        return nil
-    end
-    local ok, left, right, bottom, top = pcall(C_Map.GetMapRectOnMap, mapID, topMapID)
-    if ok then
-        return left, right, bottom, top
-    end
-    return nil
-end
+function NodeTaxi:GetTransitionEdges(mapID)
+    local edges = {}
 
-local function IsZoneMap(mapID)
-    local info = GetMapInfoRaw(mapID)
-    return info and info.mapType == 3 and mapID or nil
-end
-
-local function MakeWorldVector(x, y)
-    if CreateVector2D then
-        return CreateVector2D(x, y)
-    end
-    return nil
-end
-
-function NodeTaxi:CommonMap(a, b)
-    local chain = {}
-    local current = a
-    for _ = 1, 10 do
-        if not current or current == 0 then
-            break
+    local links = self:GetMapLinkEdges(mapID)
+    if links then
+        for target, edge in pairs(links) do
+            edges[target] = edge
         end
-        chain[current] = true
-        local info = GetMapInfoRaw(current)
-        current = info and info.parentMapID
     end
 
-    current = b
-    for _ = 1, 10 do
-        if not current or current == 0 then
-            break
+    -- A learned crossing is authoritative and overrides a link pin.
+    local learned = db.transitions[mapID]
+    if learned then
+        for target, edge in pairs(learned) do
+            edges[target] = edge
         end
-        if chain[current] then
-            return current
-        end
-        local info = GetMapInfoRaw(current)
-        current = info and info.parentMapID
     end
-    return nil
+
+    return edges
 end
 
--- Return the zone at a world position. Prefer the direct world->map lookup;
--- fall back to the continent-normalised position and GetMapInfoAtPosition.
-function NodeTaxi:ZoneAtWorld(instance, continent, worldX, worldY)
-    local vector = MakeWorldVector(worldX, worldY)
-    if not (vector and C_Map and C_Map.GetMapPosFromWorldPos) then
-        return nil
+function NodeTaxi:GetMapLinkEdges(mapID)
+    self.mapLinkCache = self.mapLinkCache or {}
+    local cached = self.mapLinkCache[mapID]
+    if cached ~= nil then
+        return cached or nil
     end
 
-    local ok, zone = pcall(C_Map.GetMapPosFromWorldPos, instance, vector)
-    if ok and zone and IsZoneMap(zone) then
-        return zone
-    end
+    local edges = {}
+    if C_Map and C_Map.GetMapLinksForMap then
+        local ok, links = pcall(C_Map.GetMapLinksForMap, mapID)
+        if ok and type(links) == "table" then
+            for _, link in ipairs(links) do
+                local target = link.linkedUiMapID
+                local position = link.position
+                local x, y
+                if position and position.GetXY then
+                    x, y = position:GetXY()
+                end
 
-    if continent then
-        local ok2, _, continentPos = pcall(C_Map.GetMapPosFromWorldPos, instance, vector, continent)
-        if ok2 and continentPos and C_Map.GetMapInfoAtPosition then
-            local cx, cy = continentPos:GetXY()
-            if cx then
-                local ok3, info = pcall(C_Map.GetMapInfoAtPosition, continent, cx, cy)
-                if ok3 and info and info.mapID and info.mapType == 3 then
-                    return info.mapID
+                if target and target ~= mapID and x then
+                    local info = GetMapInfoRaw(target)
+                    if info and info.mapType == 3 then
+                        edges[target] = {
+                            fromX = x,
+                            fromY = y,
+                            source = "link",
+                            name = link.name,
+                            atlas = link.atlasName,
+                        }
+                    end
                 end
             end
         end
+    end
 
-        local ok4, zone2 = pcall(C_Map.GetMapPosFromWorldPos, continent, vector)
-        if ok4 and zone2 and IsZoneMap(zone2) then
-            return zone2
+    self.mapLinkCache[mapID] = edges
+    return edges
+end
+
+function NodeTaxi:FindZoneRoute(startMap, destMap)
+    if startMap == destMap then
+        return { startMap }
+    end
+
+    local queue = { { startMap } }
+    local visited = { [startMap] = true }
+    local head = 1
+    local maxDepth = 12
+
+    while head <= #queue do
+        local path = queue[head]
+        head = head + 1
+        local current = path[#path]
+
+        if #path < maxDepth then
+            local edges = self:GetTransitionEdges(current)
+            for target in pairs(edges) do
+                if not visited[target] then
+                    visited[target] = true
+                    local nextPath = {}
+                    for i = 1, #path do
+                        nextPath[i] = path[i]
+                    end
+                    nextPath[#nextPath + 1] = target
+
+                    if target == destMap then
+                        return nextPath
+                    end
+                    queue[#queue + 1] = nextPath
+                end
+            end
         end
     end
 
     return nil
 end
 
-function NodeTaxi:ZonePosFromWorld(instance, worldX, worldY, zone)
-    local hbd = GetHBD()
-    if hbd and hbd.GetZoneCoordinatesFromWorldInstance then
-        local ok, x, y = pcall(hbd.GetZoneCoordinatesFromWorldInstance, hbd, worldX, worldY, instance, zone, true)
-        if ok and x then
-            return x, y
+function NodeTaxi:BuildCrossPath(zoneRoute, playerMap, px, py, dest)
+    local path = { { map = playerMap, x = px, y = py } }
+
+    for i = 2, #zoneRoute do
+        local from, to = zoneRoute[i - 1], zoneRoute[i]
+        local edge = self:GetTransitionEdges(from)[to]
+        if edge and edge.fromX then
+            path[#path + 1] = {
+                map = from,
+                x = edge.fromX,
+                y = edge.fromY,
+                transition = true,
+                source = edge.source,
+                name = edge.name,
+            }
+            if edge.toX then
+                path[#path + 1] = {
+                    map = to,
+                    x = edge.toX,
+                    y = edge.toY,
+                    transition = true,
+                    source = edge.source,
+                }
+            end
         end
     end
 
-    local vector = MakeWorldVector(worldX, worldY)
-    if vector and C_Map and C_Map.GetMapPosFromWorldPos then
-        local ok, _, position = pcall(C_Map.GetMapPosFromWorldPos, instance, vector, zone)
-        if ok and position then
-            return position:GetXY()
-        end
-    end
-
-    return nil
+    path[#path + 1] = { map = dest.map, x = dest.x, y = dest.y }
+    return path
 end
 
--- Sample the world line to the destination and return the transitions plus
--- the points that make up the full zone path.
-function NodeTaxi:TraceCrossZone(startMap, startX, startY, destMap, destX, destY)
-    local startInfo = GetMapInfoRaw(startMap)
-    if startInfo and startInfo.mapType ~= 3 then
-        return nil, "not an outdoor zone"
+-- Record a crossing when the player actually changes zone. The last sampled
+-- position is on the old side and the current position on the new side, so
+-- both ends of the edge are real walkable positions.
+function NodeTaxi:RecordZoneTransition()
+    if not db then
+        return
     end
 
+    local map, x, y = self:GetPlayerZone()
+    if not (map and x and y) then
+        return
+    end
+
+    local previous = self.lastPos
+    self.lastPos = {
+        map = map,
+        x = x,
+        y = y,
+        t = GetTime(),
+        onTaxi = UnitOnTaxi and UnitOnTaxi("player") or false,
+    }
+
+    if not previous or previous.map == map or previous.onTaxi then
+        return
+    end
+
+    local elapsed = GetTime() - (previous.t or 0)
+    if elapsed < 0 or elapsed > 10 then
+        return
+    end
+
+    local fromInfo = GetMapInfoRaw(previous.map)
+    local toInfo = GetMapInfoRaw(map)
+    if not (fromInfo and toInfo and fromInfo.mapType == 3 and toInfo.mapType == 3) then
+        return
+    end
+
+    -- Skip hearth/teleport/flight jumps; a real border crossing is close.
     local hbd = GetHBD()
-    if not (hbd and hbd.GetWorldCoordinatesFromZone) then
-        return nil, "HereBeDragons unavailable"
+    local distance
+    if hbd and hbd.GetZoneDistance then
+        local ok, value = pcall(hbd.GetZoneDistance, hbd, previous.map, previous.x, previous.y, map, x, y)
+        if ok then
+            distance = value
+        end
+    end
+    if distance and distance > 300 then
+        return
     end
 
-    local ok1, wx1, wy1, instance = pcall(hbd.GetWorldCoordinatesFromZone, hbd, startX, startY, startMap)
-    local ok2, wx2, wy2, destInstance = pcall(hbd.GetWorldCoordinatesFromZone, hbd, destX, destY, destMap)
-    if not (ok1 and wx1 and ok2 and wx2) then
-        return nil, "world coordinates unavailable"
-    end
-    if instance ~= destInstance then
-        return nil, "different continents"
-    end
+    local fromTable = db.transitions[previous.map] or {}
+    db.transitions[previous.map] = fromTable
+    local edge = fromTable[map] or { count = 0 }
+    edge.fromX, edge.fromY = previous.x, previous.y
+    edge.toX, edge.toY = x, y
+    edge.count = (edge.count or 0) + 1
+    edge.last = time()
+    edge.source = "learned"
+    fromTable[map] = edge
 
-    local common = self:CommonMap(startMap, destMap)
-    if not common or common == 947 then
-        return nil, "different continents"
-    end
+    local backTable = db.transitions[map] or {}
+    db.transitions[map] = backTable
+    local back = backTable[previous.map] or { count = 0 }
+    back.fromX, back.fromY = x, y
+    back.toX, back.toY = previous.x, previous.y
+    back.count = (back.count or 0) + 1
+    back.last = time()
+    back.source = "learned"
+    backTable[previous.map] = back
 
-    local trace, err = Route.ZonePath({
-        startWorld = { x = wx1, y = wy1 },
-        destWorld = { x = wx2, y = wy2 },
-        startZone = startMap,
-        sampleZone = function(worldX, worldY)
-            return self:ZoneAtWorld(instance, common, worldX, worldY)
-        end,
-        zonePosition = function(worldX, worldY, zone)
-            return self:ZonePosFromWorld(instance, worldX, worldY, zone)
-        end,
-        step = 20,
-        maxSamples = 800,
+    AddLog("crossing", {
+        from = previous.map,
+        to = map,
+        fromX = previous.x,
+        fromY = previous.y,
+        toX = x,
+        toY = y,
+        distance = distance,
     })
 
-    if not trace then
-        return nil, err or "zone sampling failed"
+    if edge.count == 1 then
+        Print(string.format("learned a real crossing: %s -> %s at %s.",
+            MapName(previous.map) or previous.map,
+            MapName(map) or map,
+            CoordText(previous.x, previous.y)))
     end
-    if #trace.transitions == 0 then
-        return nil, "no zone transition found"
-    end
-
-    local path = { { map = startMap, x = startX, y = startY } }
-    local transitions = {}
-    for _, transition in ipairs(trace.transitions) do
-        local fromX = math.max(0, math.min(1, transition.fromX))
-        local fromY = math.max(0, math.min(1, transition.fromY))
-        local toX = math.max(0, math.min(1, transition.toX))
-        local toY = math.max(0, math.min(1, transition.toY))
-
-        transitions[#transitions + 1] = {
-            from = transition.from,
-            to = transition.to,
-            fromX = fromX,
-            fromY = fromY,
-            toX = toX,
-            toY = toY,
-        }
-        path[#path + 1] = { map = transition.from, x = fromX, y = fromY, transition = true }
-        path[#path + 1] = { map = transition.to, x = toX, y = toY, transition = true }
-    end
-    path[#path + 1] = { map = destMap, x = destX, y = destY }
-
-    local first = transitions[1]
-    return {
-        nextMap = first.to,
-        exit = { map = startMap, x = first.fromX, y = first.fromY },
-        entry = { map = first.to, x = first.toX, y = first.toY },
-        transitions = transitions,
-        zones = trace.zones,
-        path = path,
-    }
-end
-
--- Fallback for clients where zone sampling is unavailable: leave the current
--- zone's map rectangle along the line to the target.
-function NodeTaxi:RectExitToward(startMap, startX, startY, destMap, destX, destY)
-    local startInfo = GetMapInfoRaw(startMap)
-    if startInfo and startInfo.mapType ~= 3 then
-        return nil, "not an outdoor zone"
-    end
-
-    local common = self:CommonMap(startMap, destMap)
-    if not common or common == 947 then
-        return nil, "different continents"
-    end
-
-    local left, right, top, bottom = GetMapRectRaw(startMap, common)
-    if not left then
-        return nil, "no map rectangle"
-    end
-
-    local fromX, fromY = Route.MapPointTo(startMap, startX, startY, common, GetMapRectRaw, GetMapInfoRaw)
-    local toX, toY = Route.MapPointTo(destMap, destX, destY, common, GetMapRectRaw, GetMapInfoRaw)
-    if not (fromX and toX) then
-        return nil, "map projection failed"
-    end
-
-    local exitX, exitY = Route.RectExit(fromX, fromY, toX, toY, left, right, top, bottom)
-    if not exitX then
-        return nil, "no rectangle exit"
-    end
-
-    local zoneX = (exitX - left) / (right - left)
-    local zoneY = (exitY - top) / (bottom - top)
-    zoneX = math.max(0.01, math.min(0.99, zoneX))
-    zoneY = math.max(0.01, math.min(0.99, zoneY))
-
-    return {
-        nextMap = nil,
-        exit = { map = startMap, x = zoneX, y = zoneY },
-        fallback = true,
-        path = {
-            { map = startMap, x = startX, y = startY },
-            { map = startMap, x = zoneX, y = zoneY },
-            { map = destMap, x = destX, y = destY },
-        },
-    }
 end
 
 function NodeTaxi:BuildRoute(announce)
@@ -1277,32 +1273,43 @@ function NodeTaxi:BuildRoute(announce)
     local cross
 
     if playerMap ~= dest.map then
-        local crossError
-        cross, crossError = self:TraceCrossZone(playerMap, px, py, dest.map, dest.x, dest.y)
-        if not cross then
-            local fallback, fallbackError = self:RectExitToward(playerMap, px, py, dest.map, dest.x, dest.y)
-            if fallback then
-                cross = fallback
-                crossError = fallbackError
-            else
-                self:ClearRoute(nil, true)
-                if announce then
-                    if crossError == "different continents" or fallbackError == "different continents" then
-                        Print(string.format(
-                            "target is in %s, on another continent. Land zone-transition routing is not available for that trip yet.",
-                            MapName(dest.map) or ("map " .. dest.map)))
-                    else
-                        Print(string.format(
-                            "target is in %s; could not resolve a zone transition from %s (%s).",
-                            MapName(dest.map) or ("map " .. dest.map),
-                            MapName(playerMap) or ("map " .. playerMap),
-                            tostring(crossError or fallbackError or "no border found")))
-                    end
+        local zoneRoute = self:FindZoneRoute(playerMap, dest.map)
+        if not zoneRoute then
+            self:ClearRoute(nil, true)
+            if announce then
+                local known = self:GetTransitionEdges(playerMap)
+                local names = {}
+                for target in pairs(known) do
+                    names[#names + 1] = MapName(target) or ("map " .. target)
                 end
-                return false
+                table.sort(names)
+                Print(string.format(
+                    "no known crossing from %s toward %s yet. Walk through a border or portal once with NodeTaxi loaded and it will learn the real point.%s",
+                    MapName(playerMap) or ("map " .. playerMap),
+                    MapName(dest.map) or ("map " .. dest.map),
+                    #names > 0 and (" Known exits: " .. table.concat(names, ", ") .. ".") or ""))
             end
+            return false
         end
-        planDest = { x = cross.exit.x, y = cross.exit.y }
+
+        local edge = self:GetTransitionEdges(playerMap)[zoneRoute[2]]
+        if not (edge and edge.fromX) then
+            self:ClearRoute(nil, true)
+            if announce then
+                Print("the zone route needs a crossing that has no coordinate yet.")
+            end
+            return false
+        end
+
+        cross = {
+            nextMap = zoneRoute[2],
+            edge = edge,
+            route = zoneRoute,
+            source = edge.source,
+            name = edge.name,
+            path = self:BuildCrossPath(zoneRoute, playerMap, px, py, dest),
+        }
+        planDest = { x = edge.fromX, y = edge.fromY }
     end
 
     local nodes = self:NodeListForMap(playerMap)
@@ -1381,7 +1388,7 @@ function NodeTaxi:BuildRoute(announce)
         len = plan.length,
         direct = plan.direct,
         cross = cross and (cross.nextMap or -1) or 0,
-        fallback = cross and cross.fallback or false,
+        source = cross and cross.source or nil,
     })
 
     self:Redraw()
@@ -1401,14 +1408,14 @@ function NodeTaxi:BuildRoute(announce)
                     nextName, MapName(playerMap) or "this zone",
                     MapName(dest.map) or "target",
                     plan.length, plan.direct, percent,
-                    cross.fallback and " [map-edge fallback]" or ""))
+                    " [" .. (cross.source == "link" and ("map link: " .. tostring(cross.name or "?")) or "learned crossing") .. "]"))
             else
                 Print(string.format(
                     "no known nodes on this leg; path to the %s exit in %s (then %s): %.0f yd%s",
                     nextName, MapName(playerMap) or "this zone",
                     MapName(dest.map) or "target",
                     plan.length,
-                    cross.fallback and " [map-edge fallback]" or ""))
+                    " [" .. (cross.source == "link" and ("map link: " .. tostring(cross.name or "?")) or "learned crossing") .. "]"))
             end
         else
             Print(string.format(
@@ -1885,6 +1892,7 @@ local function PrintHelp()
     Print("  /nt dest           show the TomTom arrow target")
     Print("  /nt here [herb|ore] remember a node where you stand")
     Print("  /nt nodes          node counts")
+    Print("  /nt crossings      real zone crossings known from this zone")
     Print("  /nt near [yd]      list known nodes around you, with their source")
     Print("  /nt validate       compare this spot with the baked snapshot")
     Print("  /nt log [n|clear|chat on|off]  persistent diagnostic log")
@@ -1991,10 +1999,9 @@ local function PrintDebug()
 
     local route = state.route
     if route and route.cross then
-        Print(string.format("cross-zone leg: %d transition(s), next %s, fallback %s",
-            #(route.cross.transitions or {}),
+        Print(string.format("cross-zone leg: next %s via %s",
             tostring(MapName(route.cross.nextMap or route.dest.map) or "?"),
-            tostring(route.cross.fallback or false)))
+            route.cross.source == "link" and ("map link " .. tostring(route.cross.name or "?")) or "learned crossing"))
     end
 
     if NodeTaxi.NodeIcon then
@@ -2193,6 +2200,32 @@ local function HandleCommand(message)
             end
         end
 
+    elseif command == "crossings" then
+        local mapID = NodeTaxi:GetPlayerZone()
+        local edges = mapID and NodeTaxi:GetTransitionEdges(mapID) or {}
+        local list = {}
+        for target, edge in pairs(edges) do
+            list[#list + 1] = { target = target, edge = edge }
+        end
+        table.sort(list, function(a, b)
+            return (MapName(a.target) or tostring(a.target)) < (MapName(b.target) or tostring(b.target))
+        end)
+
+        if #list == 0 then
+            Print(string.format("no real crossings known from %s yet. Walk through a border or portal once and NodeTaxi will learn it.",
+                mapID and (MapName(mapID) or mapID) or "this zone"))
+        else
+            Print(string.format("known real crossings from %s:", mapID and (MapName(mapID) or mapID) or "this zone"))
+            for _, item in ipairs(list) do
+                local edge = item.edge
+                Print(string.format("  -> %s via %s at %s%s",
+                    MapName(item.target) or ("map " .. item.target),
+                    edge.source == "link" and ("map link " .. tostring(edge.name or "?")) or "learned",
+                    CoordText(edge.fromX, edge.fromY),
+                    edge.toX and (" (entry " .. CoordText(edge.toX, edge.toY) .. ")") or ""))
+            end
+        end
+
     elseif command == "nodes" then
         local mapID = NodeTaxi:GetPlayerZone()
         Print(string.format("%d learned/imported node(s) in %s, %d total; baked snapshot: %d in this zone.",
@@ -2365,7 +2398,25 @@ driver:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 driver:RegisterEvent("MINIMAP_UPDATE_TRACKING")
 
 local elapsedSinceTick = 0
+local elapsedSincePosition = 0
 driver:SetScript("OnUpdate", function(_, elapsed)
+    if db then
+        elapsedSincePosition = elapsedSincePosition + elapsed
+        if elapsedSincePosition >= 0.5 then
+            elapsedSincePosition = 0
+            local map, x, y = NodeTaxi:GetPlayerZone()
+            if map and x and y then
+                NodeTaxi.lastPos = {
+                    map = map,
+                    x = x,
+                    y = y,
+                    t = GetTime(),
+                    onTaxi = UnitOnTaxi and UnitOnTaxi("player") or false,
+                }
+            end
+        end
+    end
+
     if not state.route then
         return
     end
@@ -2398,6 +2449,7 @@ local function OnEvent(_, event, ...)
         })
 
         NodeTaxi.activeTracking = NodeTaxi:DetectTracking()
+        NodeTaxi.lastPos = nil
         NodeTaxi:BackfillNodeIDs()
 
         local herb, ore = BuildGatherNames()
@@ -2420,6 +2472,7 @@ local function OnEvent(_, event, ...)
             return
         end
 
+        NodeTaxi:RecordZoneTransition()
         NodeTaxi:OnTrackingChanged()
 
         local mapID = NodeTaxi:GetPlayerZone()

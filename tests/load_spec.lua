@@ -65,6 +65,7 @@ local hbd = {
     GetZoneSize = function() return 1000, 1000 end,
     GetPlayerWorldPosition = function() return 0, 0, 0 end,
     GetWorldCoordinatesFromZone = function(_, x, y) return x * 1000, y * 1000, 0 end,
+    GetZoneDistance = function() return 30 end,
     GetZoneCoordinatesFromWorldInstance = function(_, worldX, worldY, instance, zone)
         if zone == 1420 and worldX < 500 then
             return worldX / 1000, worldY / 1000
@@ -101,7 +102,24 @@ _G.C_Map = {
         end
         return { name = "Eastern Kingdoms", parentMapID = 0, mapType = 2 }
     end,
-    GetMapRectOnMap = function() return nil end,
+    GetMapRectOnMap = function(child, parent)
+        if parent == 1419 and child == 1420 then
+            return 0.0, 0.5, 0.0, 1.0
+        end
+        if parent == 1419 and child == 1429 then
+            return 0.5, 1.0, 0.0, 1.0
+        end
+        return nil
+    end,
+    GetMapInfoAtPosition = function(mapID, x, y)
+        if mapID == 1419 then
+            if x < 0.5 then
+                return { mapID = 1420, mapType = 3 }
+            end
+            return { mapID = 1429, mapType = 3 }
+        end
+        return nil
+    end,
     GetMapPosFromWorldPos = function(instance, vector)
         local x, y = vector:GetXY()
         if x < 500 then
@@ -513,9 +531,33 @@ check("auto filter follows Find Herbs", allHerb and #herbFiltered == 2, #herbFil
 trackingTest = nil
 slash("kind both")
 
--- Cross-zone leg: player in Tirisfal (1420), target in Elwynn (1429).
+-- Zone transitions use only real points: learned crossings and map links.
+NodeTaxiDB.transitions = {}
+ADDON.mapLinkCache = {}
+C_Map.GetMapLinksForMap = nil
+
+-- 1. Learn a crossing from an actual zone change.
+playerZoneMap = 1420
+playerZoneX, playerZoneY = 0.49, 0.5
+ADDON.lastPos = { map = 1420, x = 0.49, y = 0.5, t = GetTime() - 1, onTaxi = false }
+playerZoneMap = 1429
+playerZoneX, playerZoneY = 0.01, 0.5
+ADDON:RecordZoneTransition()
+local learned = NodeTaxiDB.transitions[1420] and NodeTaxiDB.transitions[1420][1429]
+check("crossing is learned from a zone change", learned ~= nil)
+check("learned crossing has a real exit", learned and learned.fromX == 0.49 and learned.fromY == 0.5)
+check("learned crossing has a real entry", learned and learned.toX == 0.01 and learned.toY == 0.5)
+check("reverse crossing is learned", NodeTaxiDB.transitions[1429] and NodeTaxiDB.transitions[1429][1420] ~= nil)
+
+-- 2. Build a cross-zone leg using the learned point.
 playerZoneMap = 1420
 playerZoneX, playerZoneY = 0.2, 0.5
+slash("crossings")
+local crossingHeader = false
+for i = math.max(1, #messages - 8), #messages do
+    if messages[i]:find("known real crossings", 1, true) then crossingHeader = true end
+end
+check("crossings command lists learned edge", crossingHeader)
 ADDON:AddNode(1420, 0.3, 0.5, "ore")
 ADDON.state.dest = { map = 1429, x = 0.8, y = 0.5, title = "Cross-zone test" }
 local crossBuilt = ADDON:BuildRoute(true)
@@ -523,13 +565,15 @@ check("cross-zone route builds", crossBuilt == true)
 local crossRoute = ADDON.state.route
 check("cross-zone leg recorded", crossRoute and crossRoute.cross ~= nil)
 check("cross-zone next map", crossRoute and crossRoute.cross.nextMap == 1429,
-    crossRoute and crossRoute.cross and crossRoute.cross.nextMap)
-check("cross-zone route ends at current-zone exit", crossRoute and crossRoute.dest.map == 1420)
+    crossRoute and crossRoute.cross and tostring(crossRoute.cross.nextMap))
+check("cross-zone uses learned source", crossRoute and crossRoute.cross.source == "learned")
+check("cross-zone route ends at real exit",
+    crossRoute and crossRoute.dest.map == 1420 and crossRoute.dest.x == 0.49)
 check("cross-zone path continues to target", crossRoute and crossRoute.crossPath and #crossRoute.crossPath >= 3,
     crossRoute and crossRoute.crossPath and #crossRoute.crossPath)
 check("cross-zone leg includes a node", crossRoute and #crossRoute.nodes >= 1)
 
--- Crossing into the next zone should produce a normal same-zone leg.
+-- 3. After crossing, the next leg is a normal same-zone leg.
 playerZoneMap = 1429
 playerZoneX, playerZoneY = 0.55, 0.5
 ADDON.state.dest = { map = 1429, x = 0.2, y = 0.5, title = "Same-zone after crossing" }
@@ -537,27 +581,45 @@ local sameZoneBuilt = ADDON:BuildRoute(true)
 check("next-zone leg builds", sameZoneBuilt == true)
 check("next-zone leg is same-zone", ADDON.state.route and ADDON.state.route.cross == nil)
 check("next-zone destination is local", ADDON.state.route and ADDON.state.route.dest.map == 1429)
--- If world->zone sampling is unavailable, the map-rectangle edge is used.
-local savedGetMapPos = C_Map.GetMapPosFromWorldPos
-local savedGetRect = C_Map.GetMapRectOnMap
-C_Map.GetMapPosFromWorldPos = function() return nil end
-C_Map.GetMapRectOnMap = function(child, parent)
-    if parent == 1419 then
-        return 0.2, 0.6, 0.3, 0.7
+
+-- 4. A client map link is also a real transition point.
+NodeTaxiDB.transitions = {}
+ADDON.mapLinkCache = {}
+C_Map.GetMapLinksForMap = function(mapID)
+    if mapID == 1420 then
+        return { {
+            linkedUiMapID = 1429,
+            position = { GetXY = function() return 0.4, 0.5 end },
+            name = "Test Link",
+            atlasName = "test-atlas",
+        } }
     end
-    return nil
+    return {}
 end
 playerZoneMap = 1420
 playerZoneX, playerZoneY = 0.2, 0.5
-ADDON.state.dest = { map = 1429, x = 0.8, y = 0.5, title = "Fallback test" }
-local fallbackBuilt = ADDON:BuildRoute(true)
-check("fallback cross-zone builds", fallbackBuilt == true)
-check("fallback is marked", ADDON.state.route and ADDON.state.route.cross
-    and ADDON.state.route.cross.fallback == true)
-check("fallback has a path", ADDON.state.route and ADDON.state.route.crossPath
-    and #ADDON.state.route.crossPath >= 3)
-C_Map.GetMapPosFromWorldPos = savedGetMapPos
-C_Map.GetMapRectOnMap = savedGetRect
+ADDON.state.dest = { map = 1429, x = 0.8, y = 0.5, title = "Link test" }
+local linkBuilt = ADDON:BuildRoute(true)
+check("map-link cross-zone builds", linkBuilt == true)
+check("map-link source recorded", ADDON.state.route and ADDON.state.route.cross
+    and ADDON.state.route.cross.source == "link")
+check("map-link exit used", ADDON.state.route and ADDON.state.route.dest.x == 0.4)
+check("map-link name recorded", ADDON.state.route and ADDON.state.route.cross
+    and ADDON.state.route.cross.name == "Test Link")
+
+-- 5. With no learned crossing and no link, refuse the leg instead of guessing.
+NodeTaxiDB.transitions = {}
+C_Map.GetMapLinksForMap = nil
+ADDON.mapLinkCache = {}
+playerZoneMap = 1420
+playerZoneX, playerZoneY = 0.2, 0.5
+ADDON.state.dest = { map = 1429, x = 0.8, y = 0.5, title = "No transition test" }
+local noRouteBuilt = ADDON:BuildRoute(true)
+check("unknown crossing yields no route", noRouteBuilt == false)
+check("unknown crossing leaves no stale route", ADDON.state.route == nil)
+local unknownMessage = messages[#messages] or ""
+check("unknown crossing says so", unknownMessage:find("no known crossing", 1, true) ~= nil,
+    unknownMessage)
 
 playerZoneMap = 1429
 playerZoneX, playerZoneY = 0.5, 0.5

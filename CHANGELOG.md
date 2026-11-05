@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.1 - 2026-11-04
+
+- Fix false cross-zone legs (for example a 0 yd "Silverpine exit" while
+  standing in central Tirisfal). Zone transitions are no longer derived from
+  map rectangles or a straight-line border sample.
+- Use only real transition points: crossings learned from actual
+  `ZONE_CHANGED_NEW_AREA` transitions (both sides recorded) and client
+  `C_Map.GetMapLinksForMap` pins. If no real crossing is known, the leg is
+  refused with an explanation.
+- Add `/nt crossings` to list known crossings and map links from the current
+  zone.
+- Skip hearth/teleport/flight jumps when learning a crossing.
+
 ## 0.6.0 - 2026-11-04
 
 - Add cross-zone routing for targets on the same continent. NodeTaxi samples

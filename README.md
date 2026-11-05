@@ -28,10 +28,11 @@ reads the active target once at login) to learn *where* you are going.
    detour budget.
 5. Re-evaluates the remaining route as you move (every 30 yards by default),
    so the order follows your actual position instead of the original start.
-   Targets in another zone get a **zone-transition leg**: NodeTaxi samples the
-   world line, routes through this zone's nodes to the border crossing, and
-   rebuilds the next leg after you cross. A dim continuation line shows the
-   full zone path on the continent map.
+   Targets in another zone get a **real-crossing leg**: NodeTaxi uses crossings
+   learned from your actual zone changes plus the client's map-link pins, routes
+   through this zone's nodes to that real point, and rebuilds the next leg after
+   you cross. A dim continuation line shows the following zones. If no real
+   crossing is known, it says so instead of pointing at a mountain.
 6. Draws the result as **dashes on the world map** and on the **minimap**,
    with a Herb Gathering/Mining **resource icon** per node and a larger pulsing
    icon for the next one. Inside the ring distance (100 yd by default) the icon
@@ -229,16 +230,16 @@ survives a session and can be inspected offline.
 
 ## Known limitations (by design for this first version)
 
-* **Land zone transitions only, one leg at a time.** For a target in another
-  zone on the same continent, NodeTaxi finds the border crossing by sampling
-  the world-space line (C_Map world position, with HereBeDragons coordinates)
-  and routes through the current zone's nodes to that exit. Crossing a zone
-  rebuilds the next leg automatically. Cross-continent trips (ships,
-  zeppelins, portals) are not routed; the addon says so instead of drawing a
-  line across the ocean. If zone sampling is unavailable, a map-rectangle
-  fallback picks the edge in the target's direction. Terrain, passes and
-  impassable borders are still not modelled, so a border leg is a direction,
-  not a guaranteed walkable path.
+* **Cross-zone routing needs a known real crossing.** NodeTaxi never guesses a
+  border from map geometry. It uses (a) crossings it learned from an actual
+  `ZONE_CHANGED_NEW_AREA` transition, with the real positions on both sides,
+  and (b) the client's map-link pins (`C_Map.GetMapLinksForMap`), which are real
+  map-transition points. If neither is known for the next zone, it refuses the
+  leg and tells you to walk through the border or portal once; after that the
+  crossing is remembered. `/nt crossings` lists what it knows. Cross-continent
+  trips only work when map links connect the continents; otherwise they are
+  reported as unavailable. Terrain and impassable ground are still not
+  modelled beyond the real crossing points.
 * **No terrain data.** The dashes are straight lines between coordinates, not a
   navigable path. Cliffs, water, roads and flight paths are not modelled; the
   route is a suggestion, not an autopilot. Re-planning every 30 yards does not

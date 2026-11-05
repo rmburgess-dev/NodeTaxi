@@ -648,6 +648,19 @@ local clusterLeg = {
 }
 ADDON:BuildCorridorLeg(clusterLeg)
 check("branch takes the whole nearby cluster", #clusterLeg.nodes == 4, #clusterLeg.nodes)
+
+-- A leg with no corridor (transport or uncovered zone) must still draw a
+-- visible node line instead of going blank.
+local fallbackLeg = {
+    map = 1434,
+    startX = 0.60, startY = 0.60,
+    destX = 0.30, destY = 0.30,
+    nodes = { { x = 0.50, y = 0.50, kind = "ore" } },
+}
+ADDON:BuildFallbackLeg(fallbackLeg)
+check("no-corridor leg has a visible fallback line",
+    fallbackLeg.routePoints and #fallbackLeg.routePoints == 3,
+    fallbackLeg.routePoints and #fallbackLeg.routePoints)
 check("all-node display defaults on", ADDON.settings.allNodes == true)
 check("node deviation defaults to 100 yards", ADDON.settings.spur == 100,
     ADDON.settings.spur)

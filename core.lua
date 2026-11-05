@@ -1518,6 +1518,11 @@ function NodeTaxi:BuildCorridorLeg(leg)
         return a.projection.progress < b.projection.progress
     end)
 
+    local preferred = {}
+    for _, node in ipairs(leg.preserveNodes or {}) do
+        preferred[string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))] = true
+    end
+
     -- Cluster first, then score. Nodes within the branch radius form one
     -- cluster; a cluster can start only if at least one member is within the
     -- corridor deviation limit. Clusters are ranked by density/span so an
@@ -1639,16 +1644,29 @@ function NodeTaxi:BuildCorridorLeg(leg)
                 end
             end
             local span = math.max(0, maxProgress - startable.projection.progress)
+            local locked = 0
+            for _, candidate in ipairs(group) do
+                local key = string.format("%.4f,%.4f,%s",
+                    candidate.node.x, candidate.node.y, tostring(candidate.node.kind))
+                if preferred[key] then
+                    locked = locked + 1
+                end
+            end
             clusters[#clusters + 1] = {
                 entryProgress = startable.projection.progress,
                 mergeProgress = maxProgress,
                 nodes = ordered,
+                locked = locked,
                 score = #group / (1 + span * 1000),
             }
         end
     end
 
     table.sort(clusters, function(a, b)
+        local aLocked, bLocked = (a.locked or 0) > 0, (b.locked or 0) > 0
+        if aLocked ~= bLocked then
+            return aLocked
+        end
         if a.score == b.score then
             return a.entryProgress < b.entryProgress
         end
@@ -1840,6 +1858,37 @@ function NodeTaxi:BuildCorridorLeg(leg)
     return true
 end
 
+-- A leg with no generated corridor (transport, or an uncovered zone) still
+-- needs a visible node line. Use the real leg endpoints and the selected
+-- nodes; this is deliberately a fallback, not a corridor substitute.
+function NodeTaxi:BuildFallbackLeg(leg)
+    local route = { { x = leg.startX, y = leg.startY } }
+    local nodes = leg.nodes or {}
+    for _, node in ipairs(nodes) do
+        route[#route + 1] = { x = node.x, y = node.y, node = node }
+    end
+    local last = route[#route]
+    if math.abs(last.x - leg.destX) > 0.0001 or math.abs(last.y - leg.destY) > 0.0001 then
+        route[#route + 1] = { x = leg.destX, y = leg.destY }
+    end
+
+    local length = 0
+    for i = 2, #route do
+        local dx = route[i].x - route[i - 1].x
+        local dy = route[i].y - route[i - 1].y
+        length = length + math.sqrt(dx * dx + dy * dy)
+    end
+    local dx, dy = leg.destX - leg.startX, leg.destY - leg.startY
+    leg.routePoints = route
+    leg.plan = {
+        nodes = nodes,
+        length = length * 1000,
+        direct = math.sqrt(dx * dx + dy * dy) * 1000,
+        inCorridor = #nodes,
+    }
+    return true
+end
+
 function NodeTaxi:AttachCorridors(legs)
     local attached = 0
     for i, leg in ipairs(legs) do
@@ -1861,6 +1910,8 @@ function NodeTaxi:AttachCorridors(legs)
             end
             self:BuildCorridorLeg(leg)
             attached = attached + 1
+        else
+            self:BuildFallbackLeg(leg)
         end
     end
     return attached
@@ -2276,6 +2327,11 @@ function NodeTaxi:RefreshCurrentLeg()
     if not mapID or mapID ~= leg.map or not px then
         return false
     end
+    if #route.nodes >= settings.maxNodes then
+        -- Already at the per-leg budget. Keep the chosen route stable instead
+        -- of swapping nodes as the player moves.
+        return false
+    end
 
     local projection = ProjectOnCorridor(leg.corridorPoints, px, py)
     if not projection or projection.progress <= 0.0001 then
@@ -2283,18 +2339,37 @@ function NodeTaxi:RefreshCurrentLeg()
     end
 
     local trimmed, corridorStart = TrimCorridor(leg.corridorPoints, projection.progress)
-    local completed = {}
+    local completed, selected = {}, {}
     for i = 1, math.min((route.index or 1) - 1, #route.nodes) do
         local node = route.nodes[i]
         completed[string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))] = true
     end
+    for _, node in ipairs(route.nodes or {}) do
+        selected[string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))] = true
+    end
 
     local allNodes = {}
+    local width, height = self:GetZoneSize(mapID)
+    local nearbyNew = false
+    local radius = settings.spur or 100
     for _, node in ipairs(self:NodeListForMap(mapID)) do
         local key = string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))
         if not completed[key] then
             allNodes[#allNodes + 1] = node
+            if not selected[key] and width and height then
+                local dxp = (node.x - px) * width
+                local dyp = (node.y - py) * height
+                local dxc = (node.x - projection.x) * width
+                local dyc = (node.y - projection.y) * height
+                if dxp * dxp + dyp * dyp <= radius * radius
+                    or dxc * dxc + dyc * dyc <= radius * radius then
+                    nearbyNew = true
+                end
+            end
         end
+    end
+    if not nearbyNew then
+        return false
     end
 
     leg.corridorPoints = trimmed
@@ -2302,7 +2377,13 @@ function NodeTaxi:RefreshCurrentLeg()
     leg.allNodes = allNodes
     leg.startX, leg.startY = px, py
     leg.isFirst = true
+    local preserve = {}
+    for i = route.index or 1, #route.nodes do
+        preserve[#preserve + 1] = route.nodes[i]
+    end
+    leg.preserveNodes = preserve
     self:BuildCorridorLeg(leg)
+    leg.preserveNodes = nil
 
     route.nodes = leg.nodes or {}
     route.plan = leg.plan or route.plan

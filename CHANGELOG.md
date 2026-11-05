@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.18 - 2026-11-05
+
+- Draw a fallback node line for legs with no generated corridor, including
+  transport legs and zones not covered by the corridor data. This fixes blank
+  destination zones after a zeppelin/boat route.
+- Stop rolling re-planning once the current leg reaches `/nt max`, so a full
+  route no longer swaps its selected nodes as the player moves.
+- Add a regression test for the no-corridor fallback line.
+
 ## 0.9.17 - 2026-11-05
 
 - Add rolling corridor re-planning. As you move, the current leg is trimmed

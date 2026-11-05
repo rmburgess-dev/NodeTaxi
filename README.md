@@ -152,6 +152,10 @@ the same `UiMap` IDs as Forever. A target can have more than one connection
 nearest you. Land connections are preferred over transports when both reach
 the destination.
 
+The world map draws the selected nodes for every leg on the route. If you are
+looking at the zone map, only that zone is visible; zoom out to the continent
+to see the full multi-zone node path.
+
 Tirisfal Glades to Elwynn Forest, for example, uses:
 
 ```

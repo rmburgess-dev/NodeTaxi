@@ -22,6 +22,7 @@ local COLORS = {
     pathFirst = { 1.00, 0.95, 0.65, 1.00 },
     preview = { 0.35, 0.90, 1.00, 0.95 },
     cross = { 0.40, 0.78, 1.00, 0.35 },
+    crossPath = { 0.40, 0.78, 1.00, 0.65 },
     herb = { 0.30, 1.00, 0.45, 1.00 },
     ore = { 1.00, 0.62, 0.20, 1.00 },
     manual = { 0.90, 0.90, 0.95, 1.00 },
@@ -399,9 +400,10 @@ function NodeTaxi:RedrawWorld()
         end
     end
 
-    -- Faint continuation through the following zones, so opening the
-    -- continent map shows the whole trip, not just the current leg.
-    if route.crossPath and not route.preview then
+    -- Faint continuation through the following zones. When a full leg plan
+    -- exists we draw its nodes and path below; otherwise fall back to the
+    -- transition line only.
+    if route.crossPath and not route.preview and (not route.legs or #route.legs <= 1) then
         local previous
         for i = 2, #route.crossPath do
             local point = route.crossPath[i]
@@ -410,6 +412,51 @@ function NodeTaxi:RedrawWorld()
                 DrawDashes(worldLines, frame, previous.x, previous.y, sx, sy, 6, 8, 1.5, COLORS.cross)
             end
             previous = sx and { x = sx, y = sy } or nil
+        end
+    end
+
+    -- Future legs: their selected nodes and dashed path across each zone.
+    if route.legs and #route.legs > 1 then
+        local previousExit
+        if route.dest then
+            local ex, ey = ToScreen(route.dest.map, route.dest.x, route.dest.y)
+            if ex then
+                previousExit = { x = ex, y = ey }
+            end
+        end
+
+        for i = 2, #route.legs do
+            local leg = route.legs[i]
+            local startX, startY = ToScreen(leg.map, leg.startX, leg.startY)
+            if startX and previousExit then
+                DrawDashes(worldLines, frame, previousExit.x, previousExit.y,
+                    startX, startY, 6, 8, 1.5, COLORS.cross)
+            end
+
+            local legPoints = {}
+            if startX then
+                legPoints[#legPoints + 1] = { x = startX, y = startY }
+            end
+
+            for _, node in ipairs(leg.nodes or {}) do
+                local nx, ny = ToScreen(leg.map, node.x, node.y)
+                if nx then
+                    legPoints[#legPoints + 1] = { x = nx, y = ny }
+                    DrawWorldIcon(worldMarkers, frame, nx, ny, 10, NodeIcon(node), 0.85)
+                end
+            end
+
+            local endX, endY = ToScreen(leg.map, leg.destX, leg.destY)
+            if endX then
+                legPoints[#legPoints + 1] = { x = endX, y = endY }
+            end
+
+            for j = 2, #legPoints do
+                local a, b = legPoints[j - 1], legPoints[j]
+                DrawDashes(worldLines, frame, a.x, a.y, b.x, b.y, 6, 8, 1.5, COLORS.crossPath)
+            end
+
+            previousExit = endX and { x = endX, y = endY } or nil
         end
     end
 

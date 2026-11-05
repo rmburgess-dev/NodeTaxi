@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0 - 2026-11-04
+
+- Plan and display resource nodes for **every zone** on a cross-zone route,
+  not just the current leg. Each leg starts at the previous crossing's real
+  entry point, ends at the next real exit, and selects nodes within the same
+  corridor/detour budget.
+- World map: current leg bright, later legs dim, with all future node icons and
+  their paths visible when the continent map is open.
+- Minimap and next-node guidance remain current-leg only.
+- Chat reports both the current leg and the total nodes/zones planned.
+- `/nt replan` keeps the current leg and future display legs in sync.
+
 ## 0.7.0 - 2026-11-04
 
 - Bake Carbonite's Classic `ZoneConnections` dataset into `transitions.lua`:

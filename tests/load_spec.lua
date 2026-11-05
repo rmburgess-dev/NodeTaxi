@@ -573,6 +573,8 @@ C_Map.GetMapLinksForMap = nil
 ADDON.mapLinkCache = {}
 playerZoneMap = 1420
 playerZoneX, playerZoneY = 0.567, 0.494
+-- A node in a later zone proves the display plan covers more than the current leg.
+ADDON:AddNode(1421, 0.66, 0.40, "ore")
 ADDON.state.dest = { map = 1429, x = 0.8, y = 0.5, title = "Baked transition test" }
 local bakedBuilt = ADDON:BuildRoute(true)
 check("baked crossing builds immediately", bakedBuilt == true)
@@ -586,6 +588,15 @@ check("baked crossing uses real Tirisfal exit", bakedRoute and bakedRoute.dest.m
     and math.abs(bakedRoute.dest.y - 0.7577) < 1e-6)
 check("baked crossing is not a huge geometric jump", bakedRoute and bakedRoute.plan.length < 2000,
     bakedRoute and bakedRoute.plan.length)
+check("baked route has a leg for every zone", bakedRoute and bakedRoute.legs
+    and #bakedRoute.legs >= 10, bakedRoute and bakedRoute.legs and #bakedRoute.legs)
+check("baked route ends in Elwynn", bakedRoute and bakedRoute.legs
+    and bakedRoute.legs[#bakedRoute.legs].map == 1429)
+check("future leg nodes are included", bakedRoute and bakedRoute.totalNodes
+    and bakedRoute.totalNodes > #bakedRoute.nodes, bakedRoute and bakedRoute.totalNodes)
+local silverpineLeg = bakedRoute and bakedRoute.legs and bakedRoute.legs[2]
+check("Silverpine leg carries its node", silverpineLeg and #silverpineLeg.nodes >= 1,
+    silverpineLeg and #silverpineLeg.nodes)
 
 -- 1. Learn a crossing from an actual zone change.
 playerZoneMap = 1420

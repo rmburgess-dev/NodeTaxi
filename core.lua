@@ -1386,6 +1386,7 @@ function NodeTaxi:BuildRoute(announce)
         end
 
         cross = {
+            zones = #zoneRoute,
             nextMap = zoneRoute[2],
             edge = edge,
             route = zoneRoute,
@@ -1431,6 +1432,87 @@ function NodeTaxi:BuildRoute(announce)
         return false
     end
 
+    -- Build the full display plan, not just this leg. Every zone on the
+    -- route gets its own entry point, exit point and selected nodes, so the
+    -- continent map can show the resource path all the way to the target.
+    local legs
+    if cross then
+        legs = { {
+            map = playerMap,
+            startX = px,
+            startY = py,
+            destX = planDest.x,
+            destY = planDest.y,
+            nodes = plan.nodes,
+            plan = plan,
+        } }
+
+        local entryX, entryY = cross.edge.toX, cross.edge.toY
+        for i = 2, #cross.route do
+            -- Map-link pins do not always provide a target-side coordinate.
+            -- Do not invent one: stop the full leg display at the last real
+            -- entry point instead.
+            if not (entryX and entryY) then
+                break
+            end
+            local mapID = cross.route[i]
+            local startX, startY = entryX, entryY
+            local edgeOut
+            if i < #cross.route then
+                edgeOut = self:GetTransitionEdges(mapID, startX, startY)[cross.route[i + 1]]
+                if not (edgeOut and edgeOut.fromX) then
+                    break
+                end
+            end
+
+            local destX = edgeOut and edgeOut.fromX or dest.x
+            local destY = edgeOut and edgeOut.fromY or dest.y
+            local legPlan
+            local legWidth, legHeight = self:GetZoneSize(mapID)
+            if legWidth then
+                legPlan = Route.Plan({
+                    start = { x = startX, y = startY },
+                    dest = { x = destX, y = destY },
+                    nodes = self:NodeListForMap(mapID),
+                    width = legWidth,
+                    height = legHeight,
+                    corridor = settings.corridor,
+                    maxNodes = settings.maxNodes,
+                    detour = settings.detour,
+                })
+            end
+
+            legs[#legs + 1] = {
+                map = mapID,
+                startX = startX,
+                startY = startY,
+                destX = destX,
+                destY = destY,
+                nodes = legPlan and legPlan.nodes or {},
+                plan = legPlan,
+            }
+
+            if edgeOut then
+                entryX, entryY = edgeOut.toX, edgeOut.toY
+            end
+        end
+    else
+        legs = { {
+            map = playerMap,
+            startX = px,
+            startY = py,
+            destX = planDest.x,
+            destY = planDest.y,
+            nodes = plan.nodes,
+            plan = plan,
+        } }
+    end
+
+    local totalNodes = 0
+    for i = 1, #legs do
+        totalNodes = totalNodes + #(legs[i].nodes or {})
+    end
+
     local routeDest
     if cross then
         local nextName = (cross.nextMap and MapName(cross.nextMap))
@@ -1455,6 +1537,8 @@ function NodeTaxi:BuildRoute(announce)
         preview = false,
         cross = cross,
         crossPath = cross and cross.path or nil,
+        legs = legs,
+        totalNodes = totalNodes,
         finalDest = cross and dest or nil,
         planX = px,
         planY = py,
@@ -1472,6 +1556,8 @@ function NodeTaxi:BuildRoute(announce)
         len = plan.length,
         direct = plan.direct,
         cross = cross and (cross.nextMap or -1) or 0,
+        zones = cross and cross.zones or 1,
+        totalNodes = totalNodes,
         source = cross and cross.source or nil,
     })
 
@@ -1487,8 +1573,9 @@ function NodeTaxi:BuildRoute(announce)
         if cross then
             if #plan.nodes > 0 then
                 Print(string.format(
-                    "%d node%s toward the %s exit in %s (then %s): %.0f yd (direct %.0f, +%.0f%%)%s",
+                    "%d node%s this leg, %d across %d zones, toward the %s exit in %s (then %s): %.0f yd (direct %.0f, +%.0f%%)%s",
                     #plan.nodes, #plan.nodes == 1 and "" or "s",
+                    totalNodes, #legs,
                     nextName, MapName(playerMap) or "this zone",
                     MapName(dest.map) or "target",
                     plan.length, plan.direct, percent,
@@ -1497,7 +1584,8 @@ function NodeTaxi:BuildRoute(announce)
                         or (cross.source == "link" and ("map link: " .. tostring(cross.name or "?")) or "learned crossing")) .. "]"))
             else
                 Print(string.format(
-                    "no known nodes on this leg; path to the %s exit in %s (then %s): %.0f yd%s",
+                    "no known nodes on this leg; %d node%s across %d zones ahead, path to the %s exit in %s (then %s): %.0f yd%s",
+                    totalNodes, totalNodes == 1 and "" or "s", #legs,
                     nextName, MapName(playerMap) or "this zone",
                     MapName(dest.map) or "target",
                     plan.length,
@@ -1569,6 +1657,17 @@ function NodeTaxi:ReplanFromCurrent(announce)
     route.index = 1
     route.plan = plan
     route.planX, route.planY, route.planAt = px, py, GetTime()
+    if route.legs and route.legs[1] then
+        route.legs[1].nodes = plan.nodes
+        route.legs[1].plan = plan
+        route.legs[1].startX, route.legs[1].startY = px, py
+        route.legs[1].destX, route.legs[1].destY = route.dest.x, route.dest.y
+        local total = #plan.nodes
+        for i = 2, #route.legs do
+            total = total + #(route.legs[i].nodes or {})
+        end
+        route.totalNodes = total
+    end
     state.index = 1
 
     self:Redraw()

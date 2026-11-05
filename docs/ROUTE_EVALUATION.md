@@ -34,8 +34,9 @@ For Elwynn Forest from Tirisfal:
 | 12 | 132 | ~14k yd | More stops, still local |
 | 20 | 220 | significantly longer | Too much wandering for the intended UX |
 
-The 8 default is the best fit for “known path with little journeys.” Users who
-want denser coverage can raise it explicitly. A 0.9.20 visual pass also rejected
+The 8 default is the best fit for “known path with little journeys.” A
+per-cluster cap of 4 keeps one dense group from consuming the whole budget;
+raise it with `/nt cluster` if you want a single cluster walked more deeply. A 0.9.20 visual pass also rejected
 a distance-only cluster ordering that produced more back-and-forth; the merge
 point is now pinned forward. 0.9.22 solves the normal-sized cluster order
 exactly (entry → nodes → merge), with the bounded heuristic only for large

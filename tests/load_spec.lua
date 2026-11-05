@@ -649,6 +649,26 @@ local clusterLeg = {
 ADDON:BuildCorridorLeg(clusterLeg)
 check("branch takes the whole nearby cluster", #clusterLeg.nodes == 4, #clusterLeg.nodes)
 
+local cappedLeg = {
+    map = 1421,
+    startX = silverpineLeg.startX,
+    startY = silverpineLeg.startY,
+    destX = silverpineLeg.destX,
+    destY = silverpineLeg.destY,
+    corridorPoints = silverpineLeg.corridorPoints,
+    corridorStart = silverpineLeg.corridorStart,
+    corridorEnd = silverpineLeg.corridorEnd,
+    allNodes = {
+        { x = 0.560, y = 0.400, kind = "ore", nodeID = 201 },
+        { x = 0.565, y = 0.405, kind = "ore", nodeID = 201 },
+        { x = 0.555, y = 0.395, kind = "ore", nodeID = 201 },
+        { x = 0.555, y = 0.480, kind = "ore", nodeID = 201 },
+        { x = 0.560, y = 0.490, kind = "ore", nodeID = 201 },
+    },
+}
+ADDON:BuildCorridorLeg(cappedLeg)
+check("one cluster cannot exceed the cluster cap", #cappedLeg.nodes <= 4, #cappedLeg.nodes)
+
 -- A leg with no corridor (transport or uncovered zone) must still draw a
 -- visible node line instead of going blank.
 local fallbackLeg = {
@@ -664,6 +684,7 @@ check("no-corridor leg has a visible fallback line",
 check("all-node display defaults on", ADDON.settings.allNodes == true)
 check("node deviation defaults to 100 yards", ADDON.settings.spur == 100,
     ADDON.settings.spur)
+check("cluster cap defaults to 4", ADDON.settings.cluster == 4, ADDON.settings.cluster)
 local corridorLegs = 0
 for _, leg in ipairs(bakedRoute and bakedRoute.legs or {}) do
     if leg.corridorPoints then corridorLegs = corridorLegs + 1 end

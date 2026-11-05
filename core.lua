@@ -29,6 +29,7 @@ local DEFAULTS = {
     welcome = true,
     allNodes = true,  -- draw every known node under the displayed map
     spur = 100,      -- max yards a selected node may pull away from the reference
+    cluster = 4,     -- max nodes selected from one nearby cluster
 }
 
 NodeTaxi.nodeRevision = NodeTaxi.nodeRevision or 0
@@ -1757,7 +1758,7 @@ function NodeTaxi:BuildCorridorLeg(leg)
             -- overlaps one already selected.
         else
         local take = {}
-        local slots = settings.maxNodes - selectedCount
+        local slots = math.min(settings.maxNodes - selectedCount, settings.cluster or 4)
         for _, candidate in ipairs(cluster.nodes) do
             if #take < slots then
                 take[#take + 1] = candidate
@@ -2946,6 +2947,7 @@ local function PrintHelp()
     Print("  /nt auto on|off    rebuild when the arrow target changes")
     Print("  /nt allnodes on|off show every known node under the displayed map")
     Print("  /nt spur 100      max yards a node may pull away from the route")
+    Print("  /nt cluster 4     max nodes from one nearby cluster")
     Print("  /nt kind auto|herb|ore|both  node filter; auto follows your tracking")
     Print("  /nt debug          diagnostic information")
     Print("  /nt learn herb|ore <spellID>  teach a gather spell by hand")
@@ -2956,10 +2958,10 @@ end
 local function PrintStatus()
     InitSettingsIfNeeded()
     local playerMap = NodeTaxi:GetPlayerZone()
-    Print(string.format("settings: corridor %.0f yd, max %.0f nodes, detour %.1fx, arrive %.0f yd, auto %s, allnodes %s, spur %.0f yd, kind %s, replan %.0f yd, ring %.0f yd",
+    Print(string.format("settings: corridor %.0f yd, max %.0f nodes, detour %.1fx, arrive %.0f yd, auto %s, allnodes %s, spur %.0f yd, cluster %.0f, kind %s, replan %.0f yd, ring %.0f yd",
         settings.corridor, settings.maxNodes, settings.detour, settings.arrive,
         settings.auto and "on" or "off", settings.allNodes and "on" or "off",
-        settings.spur or 100, settings.kind, settings.replan, settings.ring))
+        settings.spur or 100, settings.cluster or 4, settings.kind, settings.replan, settings.ring))
     Print(string.format("tracking: active %s, filter %s -> using %s",
         tostring(NodeTaxi:DetectTracking() or "none"), settings.kind, NodeTaxi:GetEffectiveKind()))
     if C_Minimap and C_Minimap.GetNumTrackingTypes and C_Minimap.GetTrackingInfo then
@@ -3362,6 +3364,18 @@ local function HandleCommand(message)
                 NodeTaxi:BuildRoute(false)
             end
             Print(string.format("node spur limit: %.0f yd.", value))
+        end
+
+    elseif command == "cluster" then
+        local value = tonumber(rest)
+        if not value or value < 1 then
+            Print("usage: /nt cluster <nodes> (max nodes from one cluster)")
+        else
+            settings.cluster = math.floor(value)
+            if state.route then
+                NodeTaxi:BuildRoute(false)
+            end
+            Print(string.format("cluster limit: %.0f node(s).", settings.cluster))
         end
 
     elseif command == "auto" then

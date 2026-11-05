@@ -15,7 +15,7 @@
 
 ## Files
 
-- **Upload:** `dist/NodeTaxi-0.9.22.zip`
+- **Upload:** `dist/NodeTaxi-0.9.23.zip`
 - **Project icon:** `docs/icon-256.png` (or `docs/icon-512.png`)
 - **Description:** paste `docs/CURSEFORGE.md`
 - **Release type:** Beta (first public release, Forever data snapshot)
@@ -23,7 +23,7 @@
 ## Upload steps
 
 1. Create the project with the fields above.
-2. Upload `NodeTaxi-0.9.22.zip` for game version 1.60.1.
+2. Upload `NodeTaxi-0.9.23.zip` for game version 1.60.1.
 3. Paste the description from `docs/CURSEFORGE.md`.
 4. Upload the icon.
 5. Add TomTom as a required dependency.

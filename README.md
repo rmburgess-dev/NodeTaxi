@@ -93,9 +93,11 @@ Then, with a real TomTom waypoint set:
 | `/nt preview` | synthetic demo route |
 | `/nt width 300` | corridor half-width in yards (25-3000) |
 | `/nt max 8` | maximum nodes per route (1-20) |
+| `/nt cluster 4` | maximum nodes selected from one nearby cluster |
+| `/nt spur 100` | maximum yard deviation for a selected node |
 | `/nt detour 1.8` | route length budget as a multiple of direct distance |
 | `/nt arrive 18` | yards at which a node counts as collected |
-| `/nt replan 30` | yards moved before the remaining route is re-ordered (0 = off) |
+| `/nt replan 30` | yards moved before the remaining route is re-planned (0 = off) |
 | `/nt ring 100` | yards at which a node marker becomes a hollow ring (0 = off) |
 | `/nt auto on\|off` | rebuild automatically when the TomTom target changes |
 | `/nt kind auto\|herb\|ore\|both` | node filter; `auto` follows active tracking (default) |

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.23 - 2026-11-05
+
+- Add a per-cluster cap (`/nt cluster`, default 4) so one dense node group
+  cannot consume the whole 8-node route and turn into a large zig-zag.
+- Routes can still select up to `/nt max` nodes across multiple clusters.
+- Document `/nt spur` and `/nt cluster` in the command table.
+- Add regression coverage for the 5-node → 4-node cluster cap.
+
 ## 0.9.22 - 2026-11-05
 
 - Solve each normal-sized cluster as an exact open path (Held-Karp) from its

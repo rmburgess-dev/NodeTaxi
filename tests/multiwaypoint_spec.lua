@@ -116,6 +116,26 @@ local targets = {
 }
 
 local failures = {}
+local function pathStats(pts)
+    local reversals, maxJump, length = 0, 0, 0
+    local prevDx, prevDy
+    for i = 2, #pts do
+        local dx, dy = pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y
+        local d = math.sqrt(dx * dx + dy * dy)
+        length = length + d
+        if d > maxJump then maxJump = d end
+        if prevDx then
+            local dot = dx * prevDx + dy * prevDy
+            local norm = d * math.sqrt(prevDx * prevDx + prevDy * prevDy)
+            if norm > 0 and dot / norm < -0.5 then
+                reversals = reversals + 1
+            end
+        end
+        prevDx, prevDy = dx, dy
+    end
+    return reversals, maxJump * 1000, length * 1000
+end
+
 local function check(name, ok, detail)
     if not ok then
         failures[#failures + 1] = name .. (detail and (" (" .. tostring(detail) .. ")") or "")
@@ -132,13 +152,23 @@ for _, target in ipairs(targets) do
     check(target[4] .. " has legs", route and #(route.legs or {}) > 0)
     if route then
         local corridorLegs, fallbackLegs = 0, 0
+        local totalReversals, totalYards = 0, 0
         for _, leg in ipairs(route.legs) do
             check(target[4] .. " leg has a line", leg.routePoints and #leg.routePoints >= 2,
                 leg.map)
             check(target[4] .. " leg respects max",
                 #(leg.nodes or {}) <= ADDON.settings.maxNodes, #(leg.nodes or {}))
+            local reversals, _, legYards = pathStats(leg.routePoints or {})
+            totalReversals = totalReversals + reversals
+            totalYards = totalYards + legYards
             if leg.corridorPoints then corridorLegs = corridorLegs + 1 else fallbackLegs = fallbackLegs + 1 end
         end
+        print(string.format("%s: legs=%d nodes=%d reversals=%d yards=%.0f",
+            target[4], #route.legs, route.totalNodes or 0, totalReversals, totalYards))
+        local reversalBudget = math.max(6, #route.legs * 2)
+        check(target[4] .. " route stays reasonably direct",
+            totalReversals <= reversalBudget,
+            totalReversals .. "/" .. reversalBudget)
         if target[1] == 1429 then
             check("Elwynn is corridor-backed end to end", corridorLegs == #route.legs,
                 corridorLegs .. "/" .. #route.legs)

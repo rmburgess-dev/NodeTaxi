@@ -28,6 +28,10 @@ reads the active target once at login) to learn *where* you are going.
    detour budget.
 5. Re-evaluates the remaining route as you move (every 30 yards by default),
    so the order follows your actual position instead of the original start.
+   Targets in another zone get a **zone-transition leg**: NodeTaxi samples the
+   world line, routes through this zone's nodes to the border crossing, and
+   rebuilds the next leg after you cross. A dim continuation line shows the
+   full zone path on the continent map.
 6. Draws the result as **dashes on the world map** and on the **minimap**,
    with a Herb Gathering/Mining **resource icon** per node and a larger pulsing
    icon for the next one. Inside the ring distance (100 yd by default) the icon
@@ -225,9 +229,16 @@ survives a session and can be inspected offline.
 
 ## Known limitations (by design for this first version)
 
-* **One zone at a time.** If the TomTom target is in another zone, NodeTaxi
-  says so and waits until you are in the same zone. Cross-zone planning via
-  HereBeDragons' world coordinates is the natural next step.
+* **Land zone transitions only, one leg at a time.** For a target in another
+  zone on the same continent, NodeTaxi finds the border crossing by sampling
+  the world-space line (C_Map world position, with HereBeDragons coordinates)
+  and routes through the current zone's nodes to that exit. Crossing a zone
+  rebuilds the next leg automatically. Cross-continent trips (ships,
+  zeppelins, portals) are not routed; the addon says so instead of drawing a
+  line across the ocean. If zone sampling is unavailable, a map-rectangle
+  fallback picks the edge in the target's direction. Terrain, passes and
+  impassable borders are still not modelled, so a border leg is a direction,
+  not a guaranteed walkable path.
 * **No terrain data.** The dashes are straight lines between coordinates, not a
   navigable path. Cliffs, water, roads and flight paths are not modelled; the
   route is a suggestion, not an autopilot. Re-planning every 30 yards does not

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0 - 2026-11-04
+
+- Add cross-zone routing for targets on the same continent. NodeTaxi samples
+  the world-space line to find the zone border, plans the current zone's nodes
+  to that exit, and rebuilds the next leg after crossing.
+- Draw a faint continuation line through the following zones on the world map.
+- Add a map-rectangle fallback when zone sampling is unavailable, and explicit
+  messaging for cross-continent targets.
+- Keep `/nt replan`, tracking filtering and ring markers working per leg.
+
 ## 0.5.0 - 2026-11-04
 
 - Follow the player's active minimap tracking by default (`/nt kind auto`);

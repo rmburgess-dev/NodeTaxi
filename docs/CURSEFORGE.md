@@ -19,6 +19,10 @@ waypoints — your arrow and destination stay exactly where they were.
 - **Re-plans as you move.** Every 30 yards the remaining nodes are re-ordered
   from your current position; collected nodes are never revisited. Tune with
   `/nt replan`.
+- **Crosses zone borders.** Targets in another zone on the same continent get a
+  border leg: NodeTaxi finds the crossing, routes through this zone's nodes to
+  it, and rebuilds after you cross. A dim continuation shows the following
+  zones. Cross-continent trips are reported as unsupported.
 - **Hollow rings up close.** Inside 100 yards the icon becomes an empty ring,
   so the game's own tracking dot remains visible in the center. Tune with
   `/nt ring`.
@@ -69,6 +73,7 @@ route appears on the world map and minimap.
 | `/nt ring 100` | distance where icons become rings (0 = off) |
 | `/nt import gathermate2` | import your local GatherMate2 data |
 | `/nt seed` | show the baked snapshot version |
+| `/nt debug` | client, tracking, cross-zone leg, icon paths, snapshot |
 
 ## Data notes
 

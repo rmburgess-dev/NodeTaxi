@@ -58,13 +58,27 @@ local function newFrame()
 end
 
 local playerZoneX, playerZoneY = 0.5, 0.5
+local playerZoneMap = 1429
 
 local hbd = {
-    GetPlayerZonePosition = function() return playerZoneX, playerZoneY, 1429 end,
+    GetPlayerZonePosition = function() return playerZoneX, playerZoneY, playerZoneMap end,
     GetZoneSize = function() return 1000, 1000 end,
     GetPlayerWorldPosition = function() return 0, 0, 0 end,
     GetWorldCoordinatesFromZone = function(_, x, y) return x * 1000, y * 1000, 0 end,
+    GetZoneCoordinatesFromWorldInstance = function(_, worldX, worldY, instance, zone)
+        if zone == 1420 and worldX < 500 then
+            return worldX / 1000, worldY / 1000
+        end
+        if zone == 1429 and worldX >= 500 then
+            return worldX / 1000, worldY / 1000
+        end
+        return nil
+    end,
 }
+
+_G.CreateVector2D = function(x, y)
+    return { GetXY = function() return x, y end }
+end
 
 _G.LibStub = function(name)
     if name == "HereBeDragons-2.0" then
@@ -74,17 +88,27 @@ _G.LibStub = function(name)
 end
 
 _G.C_Map = {
-    GetBestMapForUnit = function() return 1429 end,
+    GetBestMapForUnit = function() return playerZoneMap end,
     GetPlayerMapPosition = function()
         return { GetXY = function() return playerZoneX, playerZoneY end }
     end,
     GetMapInfo = function(id)
         if id == 1429 then
-            return { name = "Elwynn Forest", parentMapID = 1419, mapType = 1 }
+            return { name = "Elwynn Forest", parentMapID = 1419, mapType = 3 }
+        end
+        if id == 1420 then
+            return { name = "Tirisfal Glades", parentMapID = 1419, mapType = 3 }
         end
         return { name = "Eastern Kingdoms", parentMapID = 0, mapType = 2 }
     end,
     GetMapRectOnMap = function() return nil end,
+    GetMapPosFromWorldPos = function(instance, vector)
+        local x, y = vector:GetXY()
+        if x < 500 then
+            return 1420, { GetXY = function() return x / 1000, y / 1000 end }
+        end
+        return 1429, { GetXY = function() return x / 1000, y / 1000 end }
+    end,
 }
 
 local trackingTest = nil
@@ -488,6 +512,55 @@ check("auto filter follows Find Herbs", allHerb and #herbFiltered == 2, #herbFil
 
 trackingTest = nil
 slash("kind both")
+
+-- Cross-zone leg: player in Tirisfal (1420), target in Elwynn (1429).
+playerZoneMap = 1420
+playerZoneX, playerZoneY = 0.2, 0.5
+ADDON:AddNode(1420, 0.3, 0.5, "ore")
+ADDON.state.dest = { map = 1429, x = 0.8, y = 0.5, title = "Cross-zone test" }
+local crossBuilt = ADDON:BuildRoute(true)
+check("cross-zone route builds", crossBuilt == true)
+local crossRoute = ADDON.state.route
+check("cross-zone leg recorded", crossRoute and crossRoute.cross ~= nil)
+check("cross-zone next map", crossRoute and crossRoute.cross.nextMap == 1429,
+    crossRoute and crossRoute.cross and crossRoute.cross.nextMap)
+check("cross-zone route ends at current-zone exit", crossRoute and crossRoute.dest.map == 1420)
+check("cross-zone path continues to target", crossRoute and crossRoute.crossPath and #crossRoute.crossPath >= 3,
+    crossRoute and crossRoute.crossPath and #crossRoute.crossPath)
+check("cross-zone leg includes a node", crossRoute and #crossRoute.nodes >= 1)
+
+-- Crossing into the next zone should produce a normal same-zone leg.
+playerZoneMap = 1429
+playerZoneX, playerZoneY = 0.55, 0.5
+ADDON.state.dest = { map = 1429, x = 0.2, y = 0.5, title = "Same-zone after crossing" }
+local sameZoneBuilt = ADDON:BuildRoute(true)
+check("next-zone leg builds", sameZoneBuilt == true)
+check("next-zone leg is same-zone", ADDON.state.route and ADDON.state.route.cross == nil)
+check("next-zone destination is local", ADDON.state.route and ADDON.state.route.dest.map == 1429)
+-- If world->zone sampling is unavailable, the map-rectangle edge is used.
+local savedGetMapPos = C_Map.GetMapPosFromWorldPos
+local savedGetRect = C_Map.GetMapRectOnMap
+C_Map.GetMapPosFromWorldPos = function() return nil end
+C_Map.GetMapRectOnMap = function(child, parent)
+    if parent == 1419 then
+        return 0.2, 0.6, 0.3, 0.7
+    end
+    return nil
+end
+playerZoneMap = 1420
+playerZoneX, playerZoneY = 0.2, 0.5
+ADDON.state.dest = { map = 1429, x = 0.8, y = 0.5, title = "Fallback test" }
+local fallbackBuilt = ADDON:BuildRoute(true)
+check("fallback cross-zone builds", fallbackBuilt == true)
+check("fallback is marked", ADDON.state.route and ADDON.state.route.cross
+    and ADDON.state.route.cross.fallback == true)
+check("fallback has a path", ADDON.state.route and ADDON.state.route.crossPath
+    and #ADDON.state.route.crossPath >= 3)
+C_Map.GetMapPosFromWorldPos = savedGetMapPos
+C_Map.GetMapRectOnMap = savedGetRect
+
+playerZoneMap = 1429
+playerZoneX, playerZoneY = 0.5, 0.5
 
 -- Save/load round trip of the settings table.
 check("settings persisted in memory", _G.NodeTaxiDB.settings.corridor == 250)

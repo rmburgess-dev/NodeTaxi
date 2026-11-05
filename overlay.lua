@@ -21,6 +21,7 @@ local COLORS = {
     path = { 1.00, 0.82, 0.20, 0.92 },      -- taxi yellow
     pathFirst = { 1.00, 0.95, 0.65, 1.00 },
     preview = { 0.35, 0.90, 1.00, 0.95 },
+    cross = { 0.40, 0.78, 1.00, 0.35 },
     herb = { 0.30, 1.00, 0.45, 1.00 },
     ore = { 1.00, 0.62, 0.20, 1.00 },
     manual = { 0.90, 0.90, 0.95, 1.00 },
@@ -395,6 +396,20 @@ function NodeTaxi:RedrawWorld()
         local dx, dy = ToScreen(route.dest.map, route.dest.x, route.dest.y)
         if dx then
             points[#points + 1] = { x = dx, y = dy, dest = true }
+        end
+    end
+
+    -- Faint continuation through the following zones, so opening the
+    -- continent map shows the whole trip, not just the current leg.
+    if route.crossPath and not route.preview then
+        local previous
+        for i = 2, #route.crossPath do
+            local point = route.crossPath[i]
+            local sx, sy = ToScreen(point.map, point.x, point.y)
+            if sx and previous then
+                DrawDashes(worldLines, frame, previous.x, previous.y, sx, sy, 6, 8, 1.5, COLORS.cross)
+            end
+            previous = sx and { x = sx, y = sy } or nil
         end
     end
 

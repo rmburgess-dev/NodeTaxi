@@ -220,6 +220,61 @@ do
     check("node on target ignored", plan and #plan.nodes == 1, plan and #plan.nodes)
 end
 
+
+-- 9. Zone path sampling ----------------------------------------------------
+do
+    local trace, err = Route.ZonePath({
+        startWorld = { x = 0, y = 0 },
+        destWorld = { x = 100, y = 0 },
+        startZone = 1,
+        step = 5,
+        sampleZone = function(x)
+            if x < 40 then return 1 end
+            if x < 75 then return 2 end
+            return 3
+        end,
+        zonePosition = function(x, y, zone)
+            return x / 100, y / 100
+        end,
+    })
+
+    check("zone path exists", trace ~= nil, err)
+    check("zone path has two transitions", trace and #trace.transitions == 2, trace and #trace.transitions)
+    if trace and #trace.transitions == 2 then
+        check("first transition is 1->2", trace.transitions[1].from == 1 and trace.transitions[1].to == 2)
+        check("second transition is 2->3", trace.transitions[2].from == 2 and trace.transitions[2].to == 3)
+        approx(trace.transitions[1].fromX, 0.4, 0.02, "first boundary x")
+        approx(trace.transitions[2].fromX, 0.75, 0.02, "second boundary x")
+        check("zones in order", #trace.zones == 3 and trace.zones[1] == 1 and trace.zones[3] == 3)
+    end
+
+    local same = Route.ZonePath({
+        startWorld = { x = 10, y = 10 },
+        destWorld = { x = 20, y = 12 },
+        startZone = 7,
+        sampleZone = function() return 7 end,
+        zonePosition = function(x, y) return x / 100, y / 100 end,
+    })
+    check("same-zone path has no transitions", same and #same.transitions == 0)
+end
+
+-- 10. Rectangle exit fallback ---------------------------------------------
+do
+    local x, y, t = Route.RectExit(0.5, 0.5, 1.5, 0.5, 0.1, 0.9, 0.1, 0.9)
+    approx(x, 0.9, 1e-9, "rect exit x")
+    approx(y, 0.5, 1e-9, "rect exit y")
+    approx(t, 0.4, 1e-9, "rect exit t")
+
+    local outside = Route.RectExit(2, 2, 3, 3, 0.1, 0.9, 0.1, 0.9)
+    check("rect exit nil when starting outside", outside == nil)
+
+    -- Destination still inside an overlapping rectangle: extrapolate to the
+    -- edge in the target direction.
+    local ex, ey = Route.RectExit(0.5, 0.5, 0.6, 0.5, 0.1, 0.9, 0.1, 0.9)
+    approx(ex, 0.9, 1e-9, "rect extrapolated edge x")
+    approx(ey, 0.5, 1e-9, "rect extrapolated edge y")
+end
+
 print(string.format("%d checks, %d failure(s)", checks, failures))
 if failures > 0 then
     os.exit(1)

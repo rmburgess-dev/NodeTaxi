@@ -361,9 +361,10 @@ local function FormatLogEntry(entry)
             clock, FormatDistance(entry.herb), FormatDistance(entry.ore),
             FormatDistance(entry.stored), CoordText(entry.x, entry.y))
     elseif event == "route" then
-        return string.format("%s route %d node(s) len=%.0f direct=%.0f target=%s",
+        return string.format("%s route %d node(s) len=%.0f direct=%.0f target=%s cross=%s%s",
             clock, entry.nodes or 0, entry.len or 0, entry.direct or 0,
-            CoordText(entry.tx, entry.ty))
+            CoordText(entry.tx, entry.ty), tostring(entry.cross or 0),
+            entry.fallback and " fallback" or "")
     elseif event == "session" then
         return string.format("%s session v%s build=%s seed=%s (%s nodes)",
             clock, tostring(entry.v), tostring(entry.build), tostring(entry.seed),
@@ -988,6 +989,252 @@ function NodeTaxi:Redraw()
     end
 end
 
+--[[ Cross-zone legs ---------------------------------------------------------
+    A route to another zone is built one leg at a time: find the border you
+    should cross, route through the nodes in this zone to that exit, and rebuild
+    from the new zone when the player crosses. The full zone path is kept for a
+    dim continuation line on the world map.
+----------------------------------------------------------------------------]]
+local function GetMapInfoRaw(mapID)
+    if not (C_Map and C_Map.GetMapInfo) then
+        return nil
+    end
+    local ok, info = pcall(C_Map.GetMapInfo, mapID)
+    if ok then
+        return info
+    end
+    return nil
+end
+
+local function GetMapRectRaw(mapID, topMapID)
+    if not (C_Map and C_Map.GetMapRectOnMap) then
+        return nil
+    end
+    local ok, left, right, bottom, top = pcall(C_Map.GetMapRectOnMap, mapID, topMapID)
+    if ok then
+        return left, right, bottom, top
+    end
+    return nil
+end
+
+local function IsZoneMap(mapID)
+    local info = GetMapInfoRaw(mapID)
+    return info and info.mapType == 3 and mapID or nil
+end
+
+local function MakeWorldVector(x, y)
+    if CreateVector2D then
+        return CreateVector2D(x, y)
+    end
+    return nil
+end
+
+function NodeTaxi:CommonMap(a, b)
+    local chain = {}
+    local current = a
+    for _ = 1, 10 do
+        if not current or current == 0 then
+            break
+        end
+        chain[current] = true
+        local info = GetMapInfoRaw(current)
+        current = info and info.parentMapID
+    end
+
+    current = b
+    for _ = 1, 10 do
+        if not current or current == 0 then
+            break
+        end
+        if chain[current] then
+            return current
+        end
+        local info = GetMapInfoRaw(current)
+        current = info and info.parentMapID
+    end
+    return nil
+end
+
+-- Return the zone at a world position. Prefer the direct world->map lookup;
+-- fall back to the continent-normalised position and GetMapInfoAtPosition.
+function NodeTaxi:ZoneAtWorld(instance, continent, worldX, worldY)
+    local vector = MakeWorldVector(worldX, worldY)
+    if not (vector and C_Map and C_Map.GetMapPosFromWorldPos) then
+        return nil
+    end
+
+    local ok, zone = pcall(C_Map.GetMapPosFromWorldPos, instance, vector)
+    if ok and zone and IsZoneMap(zone) then
+        return zone
+    end
+
+    if continent then
+        local ok2, _, continentPos = pcall(C_Map.GetMapPosFromWorldPos, instance, vector, continent)
+        if ok2 and continentPos and C_Map.GetMapInfoAtPosition then
+            local cx, cy = continentPos:GetXY()
+            if cx then
+                local ok3, info = pcall(C_Map.GetMapInfoAtPosition, continent, cx, cy)
+                if ok3 and info and info.mapID and info.mapType == 3 then
+                    return info.mapID
+                end
+            end
+        end
+
+        local ok4, zone2 = pcall(C_Map.GetMapPosFromWorldPos, continent, vector)
+        if ok4 and zone2 and IsZoneMap(zone2) then
+            return zone2
+        end
+    end
+
+    return nil
+end
+
+function NodeTaxi:ZonePosFromWorld(instance, worldX, worldY, zone)
+    local hbd = GetHBD()
+    if hbd and hbd.GetZoneCoordinatesFromWorldInstance then
+        local ok, x, y = pcall(hbd.GetZoneCoordinatesFromWorldInstance, hbd, worldX, worldY, instance, zone, true)
+        if ok and x then
+            return x, y
+        end
+    end
+
+    local vector = MakeWorldVector(worldX, worldY)
+    if vector and C_Map and C_Map.GetMapPosFromWorldPos then
+        local ok, _, position = pcall(C_Map.GetMapPosFromWorldPos, instance, vector, zone)
+        if ok and position then
+            return position:GetXY()
+        end
+    end
+
+    return nil
+end
+
+-- Sample the world line to the destination and return the transitions plus
+-- the points that make up the full zone path.
+function NodeTaxi:TraceCrossZone(startMap, startX, startY, destMap, destX, destY)
+    local startInfo = GetMapInfoRaw(startMap)
+    if startInfo and startInfo.mapType ~= 3 then
+        return nil, "not an outdoor zone"
+    end
+
+    local hbd = GetHBD()
+    if not (hbd and hbd.GetWorldCoordinatesFromZone) then
+        return nil, "HereBeDragons unavailable"
+    end
+
+    local ok1, wx1, wy1, instance = pcall(hbd.GetWorldCoordinatesFromZone, hbd, startX, startY, startMap)
+    local ok2, wx2, wy2, destInstance = pcall(hbd.GetWorldCoordinatesFromZone, hbd, destX, destY, destMap)
+    if not (ok1 and wx1 and ok2 and wx2) then
+        return nil, "world coordinates unavailable"
+    end
+    if instance ~= destInstance then
+        return nil, "different continents"
+    end
+
+    local common = self:CommonMap(startMap, destMap)
+    if not common or common == 947 then
+        return nil, "different continents"
+    end
+
+    local trace, err = Route.ZonePath({
+        startWorld = { x = wx1, y = wy1 },
+        destWorld = { x = wx2, y = wy2 },
+        startZone = startMap,
+        sampleZone = function(worldX, worldY)
+            return self:ZoneAtWorld(instance, common, worldX, worldY)
+        end,
+        zonePosition = function(worldX, worldY, zone)
+            return self:ZonePosFromWorld(instance, worldX, worldY, zone)
+        end,
+        step = 20,
+        maxSamples = 800,
+    })
+
+    if not trace then
+        return nil, err or "zone sampling failed"
+    end
+    if #trace.transitions == 0 then
+        return nil, "no zone transition found"
+    end
+
+    local path = { { map = startMap, x = startX, y = startY } }
+    local transitions = {}
+    for _, transition in ipairs(trace.transitions) do
+        local fromX = math.max(0, math.min(1, transition.fromX))
+        local fromY = math.max(0, math.min(1, transition.fromY))
+        local toX = math.max(0, math.min(1, transition.toX))
+        local toY = math.max(0, math.min(1, transition.toY))
+
+        transitions[#transitions + 1] = {
+            from = transition.from,
+            to = transition.to,
+            fromX = fromX,
+            fromY = fromY,
+            toX = toX,
+            toY = toY,
+        }
+        path[#path + 1] = { map = transition.from, x = fromX, y = fromY, transition = true }
+        path[#path + 1] = { map = transition.to, x = toX, y = toY, transition = true }
+    end
+    path[#path + 1] = { map = destMap, x = destX, y = destY }
+
+    local first = transitions[1]
+    return {
+        nextMap = first.to,
+        exit = { map = startMap, x = first.fromX, y = first.fromY },
+        entry = { map = first.to, x = first.toX, y = first.toY },
+        transitions = transitions,
+        zones = trace.zones,
+        path = path,
+    }
+end
+
+-- Fallback for clients where zone sampling is unavailable: leave the current
+-- zone's map rectangle along the line to the target.
+function NodeTaxi:RectExitToward(startMap, startX, startY, destMap, destX, destY)
+    local startInfo = GetMapInfoRaw(startMap)
+    if startInfo and startInfo.mapType ~= 3 then
+        return nil, "not an outdoor zone"
+    end
+
+    local common = self:CommonMap(startMap, destMap)
+    if not common or common == 947 then
+        return nil, "different continents"
+    end
+
+    local left, right, top, bottom = GetMapRectRaw(startMap, common)
+    if not left then
+        return nil, "no map rectangle"
+    end
+
+    local fromX, fromY = Route.MapPointTo(startMap, startX, startY, common, GetMapRectRaw, GetMapInfoRaw)
+    local toX, toY = Route.MapPointTo(destMap, destX, destY, common, GetMapRectRaw, GetMapInfoRaw)
+    if not (fromX and toX) then
+        return nil, "map projection failed"
+    end
+
+    local exitX, exitY = Route.RectExit(fromX, fromY, toX, toY, left, right, top, bottom)
+    if not exitX then
+        return nil, "no rectangle exit"
+    end
+
+    local zoneX = (exitX - left) / (right - left)
+    local zoneY = (exitY - top) / (bottom - top)
+    zoneX = math.max(0.01, math.min(0.99, zoneX))
+    zoneY = math.max(0.01, math.min(0.99, zoneY))
+
+    return {
+        nextMap = nil,
+        exit = { map = startMap, x = zoneX, y = zoneY },
+        fallback = true,
+        path = {
+            { map = startMap, x = startX, y = startY },
+            { map = startMap, x = zoneX, y = zoneY },
+            { map = destMap, x = destX, y = destY },
+        },
+    }
+end
+
 function NodeTaxi:BuildRoute(announce)
     InitSettingsIfNeeded()
 
@@ -1007,17 +1254,6 @@ function NodeTaxi:BuildRoute(announce)
         return false
     end
 
-    if playerMap ~= dest.map then
-        self:ClearRoute(nil, true)
-        if announce then
-            Print(string.format(
-                "the arrow target is in %s, you are in %s. NodeTaxi plans inside one zone for now.",
-                MapName(dest.map) or ("map " .. dest.map),
-                MapName(playerMap) or ("map " .. playerMap)))
-        end
-        return false
-    end
-
     local width, height = self:GetZoneSize(playerMap)
     if not width then
         if announce then
@@ -1026,10 +1262,53 @@ function NodeTaxi:BuildRoute(announce)
         return false
     end
 
+    local destInfo = GetMapInfoRaw(dest.map)
+    if destInfo and destInfo.mapType ~= 3 then
+        self:ClearRoute(nil, true)
+        if announce then
+            Print(string.format(
+                "the TomTom target is on %s, which is not a zone map. Zoom into the destination zone and set the waypoint there.",
+                MapName(dest.map) or ("map " .. dest.map)))
+        end
+        return false
+    end
+
+    local planDest = { x = dest.x, y = dest.y }
+    local cross
+
+    if playerMap ~= dest.map then
+        local crossError
+        cross, crossError = self:TraceCrossZone(playerMap, px, py, dest.map, dest.x, dest.y)
+        if not cross then
+            local fallback, fallbackError = self:RectExitToward(playerMap, px, py, dest.map, dest.x, dest.y)
+            if fallback then
+                cross = fallback
+                crossError = fallbackError
+            else
+                self:ClearRoute(nil, true)
+                if announce then
+                    if crossError == "different continents" or fallbackError == "different continents" then
+                        Print(string.format(
+                            "target is in %s, on another continent. Land zone-transition routing is not available for that trip yet.",
+                            MapName(dest.map) or ("map " .. dest.map)))
+                    else
+                        Print(string.format(
+                            "target is in %s; could not resolve a zone transition from %s (%s).",
+                            MapName(dest.map) or ("map " .. dest.map),
+                            MapName(playerMap) or ("map " .. playerMap),
+                            tostring(crossError or fallbackError or "no border found")))
+                    end
+                end
+                return false
+            end
+        end
+        planDest = { x = cross.exit.x, y = cross.exit.y }
+    end
+
     local nodes = self:NodeListForMap(playerMap)
     local plan, err = Route.Plan({
         start = { x = px, y = py },
-        dest = { x = dest.x, y = dest.y },
+        dest = { x = planDest.x, y = planDest.y },
         nodes = nodes,
         width = width,
         height = height,
@@ -1045,7 +1324,7 @@ function NodeTaxi:BuildRoute(announce)
         return false
     end
 
-    if #plan.nodes == 0 then
+    if #plan.nodes == 0 and not cross then
         self:ClearRoute(nil, true)
         if announce then
             if plan.inCorridor > 0 then
@@ -1061,13 +1340,31 @@ function NodeTaxi:BuildRoute(announce)
         return false
     end
 
+    local routeDest
+    if cross then
+        local nextName = (cross.nextMap and MapName(cross.nextMap))
+            or MapName(dest.map)
+            or "next zone"
+        routeDest = {
+            map = playerMap,
+            x = planDest.x,
+            y = planDest.y,
+            title = "exit toward " .. nextName,
+        }
+    else
+        routeDest = { map = dest.map, x = dest.x, y = dest.y, title = dest.title }
+    end
+
     state.route = {
         map = playerMap,
         nodes = plan.nodes,
-        dest = { map = dest.map, x = dest.x, y = dest.y, title = dest.title },
+        dest = routeDest,
         index = 1,
         plan = plan,
         preview = false,
+        cross = cross,
+        crossPath = cross and cross.path or nil,
+        finalDest = cross and dest or nil,
         planX = px,
         planY = py,
         planAt = GetTime(),
@@ -1078,29 +1375,55 @@ function NodeTaxi:BuildRoute(announce)
         map = playerMap,
         x = px,
         y = py,
-        tx = dest.x,
-        ty = dest.y,
+        tx = planDest.x,
+        ty = planDest.y,
         nodes = #plan.nodes,
         len = plan.length,
         direct = plan.direct,
+        cross = cross and (cross.nextMap or -1) or 0,
+        fallback = cross and cross.fallback or false,
     })
 
     self:Redraw()
 
     if announce then
+        local nextName = (cross and cross.nextMap and MapName(cross.nextMap))
+            or MapName(dest.map)
+            or "next zone"
         local extra = plan.length - plan.direct
         local percent = plan.direct > 0 and (extra / plan.direct * 100) or 0
-        Print(string.format(
-            "%d node%s on the way to %s in %s: %.0f yd (direct %.0f, +%.0f%%)",
-            plan.nodes and #plan.nodes or 0,
-            (plan.nodes and #plan.nodes == 1) and "" or "s",
-            CoordText(dest.x, dest.y),
-            MapName(dest.map) or ("map " .. dest.map),
-            plan.length, plan.direct, percent))
+
+        if cross then
+            if #plan.nodes > 0 then
+                Print(string.format(
+                    "%d node%s toward the %s exit in %s (then %s): %.0f yd (direct %.0f, +%.0f%%)%s",
+                    #plan.nodes, #plan.nodes == 1 and "" or "s",
+                    nextName, MapName(playerMap) or "this zone",
+                    MapName(dest.map) or "target",
+                    plan.length, plan.direct, percent,
+                    cross.fallback and " [map-edge fallback]" or ""))
+            else
+                Print(string.format(
+                    "no known nodes on this leg; path to the %s exit in %s (then %s): %.0f yd%s",
+                    nextName, MapName(playerMap) or "this zone",
+                    MapName(dest.map) or "target",
+                    plan.length,
+                    cross.fallback and " [map-edge fallback]" or ""))
+            end
+        else
+            Print(string.format(
+                "%d node%s on the way to %s in %s: %.0f yd (direct %.0f, +%.0f%%)",
+                plan.nodes and #plan.nodes or 0,
+                (plan.nodes and #plan.nodes == 1) and "" or "s",
+                CoordText(dest.x, dest.y),
+                MapName(dest.map) or ("map " .. dest.map),
+                plan.length, plan.direct, percent))
+        end
     end
 
     return true
 end
+
 
 -- Re-evaluate the remaining route from where the player is now. Completed
 -- nodes (those before route.index) are not fed back in, so the new order
@@ -1613,8 +1936,9 @@ local function PrintStatus()
 
     local route = state.route
     if route then
-        Print(string.format("route: %d node(s), %d remaining, drawn on map/minimap",
-            #route.nodes, math.max(0, #route.nodes - route.index + 1)))
+        Print(string.format("route: %d node(s), %d remaining%s, drawn on map/minimap",
+            #route.nodes, math.max(0, #route.nodes - route.index + 1),
+            route.cross and (" (leg toward " .. (MapName(route.cross.nextMap or route.dest.map) or "next zone") .. ")") or ""))
     end
 end
 
@@ -1664,6 +1988,14 @@ local function PrintDebug()
 
     Print(string.format("log: %d entries (chat %s); /nt log",
         #(db.log or {}), settings.logChat and "on" or "off"))
+
+    local route = state.route
+    if route and route.cross then
+        Print(string.format("cross-zone leg: %d transition(s), next %s, fallback %s",
+            #(route.cross.transitions or {}),
+            tostring(MapName(route.cross.nextMap or route.dest.map) or "?"),
+            tostring(route.cross.fallback or false)))
+    end
 
     if NodeTaxi.NodeIcon then
         Print("icons: copper=" .. tostring(NodeTaxi.NodeIcon({ kind = "ore", nodeID = 201 }))
@@ -2100,7 +2432,8 @@ local function OnEvent(_, event, ...)
         end
 
         local dest = state.dest
-        if dest and dest.map == mapID and not state.route and settings.auto then
+        if dest and not state.route and settings.auto then
+            -- This also rebuilds the next zone leg after a border crossing.
             ScheduleBuild(1.0)
         end
 

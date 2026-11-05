@@ -1494,47 +1494,17 @@ function NodeTaxi:BuildCorridorLeg(leg)
         groupStart = groupEnd + 1
     end
 
+    -- The corridor is only the reference used to select and order nodes.
+    -- The drawn line is one forward chain: start -> nodes in corridor order
+    -- -> destination. No corridor vertices and no return-to-projection spurs.
     local route = {}
-    local function Add(x, y)
-        local previous = route[#route]
-        if previous and math.abs(previous.x - x) < 0.0001 and math.abs(previous.y - y) < 0.0001 then
-            return
-        end
-        route[#route + 1] = { x = x, y = y }
+    if leg.startX and leg.startY then
+        route[#route + 1] = { x = leg.startX, y = leg.startY }
     end
-
-    Add(leg.startX, leg.startY)
-    if leg.corridorStart then
-        Add(leg.corridorStart.x, leg.corridorStart.y)
-    end
-    Add(corridor[1].x, corridor[1].y)
-
-    local lastSegment, lastProgress = 1, 0
     for _, item in ipairs(ordered) do
-        local projection = item.projection
-        if projection.progress > lastProgress + 0.001 then
-            local segment = lastSegment
-            while segment < projection.segment do
-                Add(corridor[segment + 1].x, corridor[segment + 1].y)
-                segment = segment + 1
-            end
-            Add(projection.x, projection.y)
-            lastSegment = projection.segment
-            lastProgress = projection.progress
-        end
-        Add(item.node.x, item.node.y)
+        route[#route + 1] = { x = item.node.x, y = item.node.y }
     end
-
-    local segment = lastSegment
-    while segment < #corridor do
-        Add(corridor[segment + 1].x, corridor[segment + 1].y)
-        segment = segment + 1
-    end
-
-    if leg.corridorEnd then
-        Add(leg.corridorEnd.x, leg.corridorEnd.y)
-    end
-    Add(leg.destX, leg.destY)
+    route[#route + 1] = { x = leg.destX, y = leg.destY }
 
     local length = 0
     for i = 2, #route do

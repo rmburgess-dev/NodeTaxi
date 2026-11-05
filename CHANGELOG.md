@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.3 - 2026-11-05
+
+- Make the drawn route one forward chain: start, selected nodes in corridor
+  order, destination. Remove corridor vertices and the return-to-projection
+  step that caused giant circles and double-backs.
+- The hidden corridor now only selects and orders nodes.
+- Keep the single taxi-yellow dashed style for current and later legs.
+
 ## 0.9.2 - 2026-11-05
 
 - Fix the radial "star" around nodes that shared one corridor projection:

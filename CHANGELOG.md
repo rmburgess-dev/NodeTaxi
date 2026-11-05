@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.8 - 2026-11-05
+
+- Cap node deviations at 75 yards from the corridor by default. Nodes farther
+  out remain visible in the all-node field but are not added to the route.
+- Visit a selected node as a short out-and-back to the same road point, then
+  continue forward, instead of drawing a long diagonal to the next corridor
+  point.
+- `/nt spur <yards>` tunes the limit.
+- Keep the whole-map node field and corridor-shaped route.
+
 ## 0.9.7 - 2026-11-05
 
 - Follow the corridor forward between nodes instead of drawing straight

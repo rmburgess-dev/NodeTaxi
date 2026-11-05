@@ -27,7 +27,8 @@ local DEFAULTS = {
     logChat = true,   -- also print one line per gather/validation
     debug = false,
     welcome = true,
-    allNodes = true,  -- draw every known node in the route zones, not only selected
+    allNodes = true,  -- draw every known node under the displayed map
+    spur = 75,       -- max yards a selected node may pull away from the reference
 }
 
 NodeTaxi.nodeRevision = NodeTaxi.nodeRevision or 0
@@ -1435,6 +1436,7 @@ function NodeTaxi:BuildCorridorLeg(leg)
     local zoneWidth, zoneHeight = self:GetZoneSize(leg.map)
     local allNodes = leg.allNodes or self:NodeListForMap(leg.map)
     leg.allNodes = allNodes
+    local maxOffset = math.min(settings.corridor, settings.spur or 100)
     local candidates = {}
     for _, node in ipairs(allNodes) do
         local projection = ProjectOnCorridor(corridor, node.x, node.y)
@@ -1443,7 +1445,7 @@ function NodeTaxi:BuildCorridorLeg(leg)
             offsetYards = math.sqrt(
                 (projection.dx * zoneWidth) ^ 2 + (projection.dy * zoneHeight) ^ 2)
         end
-        if offsetYards <= settings.corridor then
+        if offsetYards <= maxOffset then
             candidates[#candidates + 1] = {
                 node = node,
                 projection = projection,
@@ -1563,6 +1565,8 @@ function NodeTaxi:BuildCorridorLeg(leg)
                     nodesOut[#nodesOut + 1] = item.node
                     currentX, currentY = item.node.x, item.node.y
                 end
+                Add(projection.x, projection.y)
+                currentX, currentY = projection.x, projection.y
                 index = clusterEnd + 1
             end
         end
@@ -2501,7 +2505,8 @@ local function PrintHelp()
     Print("  /nt replan 30      yards moved before the remaining route is re-ordered (0 = off)")
     Print("  /nt ring 100       yards at which a node marker becomes a hollow ring (0 = off)")
     Print("  /nt auto on|off    rebuild when the arrow target changes")
-    Print("  /nt allnodes on|off show every known node in route zones")
+    Print("  /nt allnodes on|off show every known node under the displayed map")
+    Print("  /nt spur 100      max yards a node may pull away from the route")
     Print("  /nt kind auto|herb|ore|both  node filter; auto follows your tracking")
     Print("  /nt debug          diagnostic information")
     Print("  /nt learn herb|ore <spellID>  teach a gather spell by hand")
@@ -2512,9 +2517,10 @@ end
 local function PrintStatus()
     InitSettingsIfNeeded()
     local playerMap = NodeTaxi:GetPlayerZone()
-    Print(string.format("settings: corridor %.0f yd, max %.0f nodes, detour %.1fx, arrive %.0f yd, auto %s, allnodes %s, kind %s, replan %.0f yd, ring %.0f yd",
+    Print(string.format("settings: corridor %.0f yd, max %.0f nodes, detour %.1fx, arrive %.0f yd, auto %s, allnodes %s, spur %.0f yd, kind %s, replan %.0f yd, ring %.0f yd",
         settings.corridor, settings.maxNodes, settings.detour, settings.arrive,
-        settings.auto and "on" or "off", settings.allNodes and "on" or "off", settings.kind, settings.replan, settings.ring))
+        settings.auto and "on" or "off", settings.allNodes and "on" or "off",
+        settings.spur or 100, settings.kind, settings.replan, settings.ring))
     Print(string.format("tracking: active %s, filter %s -> using %s",
         tostring(NodeTaxi:DetectTracking() or "none"), settings.kind, NodeTaxi:GetEffectiveKind()))
     if C_Minimap and C_Minimap.GetNumTrackingTypes and C_Minimap.GetTrackingInfo then
@@ -2905,6 +2911,18 @@ local function HandleCommand(message)
                 NodeTaxi:Redraw()
             end
             Print("all node icons " .. (value and "on" or "off") .. ".")
+        end
+
+    elseif command == "spur" then
+        local value = tonumber(rest)
+        if not value or value < 0 then
+            Print("usage: /nt spur <yards> (0 = no node detours)")
+        else
+            settings.spur = value
+            if state.route then
+                NodeTaxi:BuildRoute(false)
+            end
+            Print(string.format("node spur limit: %.0f yd.", value))
         end
 
     elseif command == "auto" then

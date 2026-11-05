@@ -581,7 +581,7 @@ ADDON.mapLinkCache = {}
 playerZoneMap = 1420
 playerZoneX, playerZoneY = 0.567, 0.494
 -- A node in a later zone proves the display plan covers more than the current leg.
-ADDON:AddNode(1421, 0.66, 0.40, "ore")
+ADDON:AddNode(1421, 0.56, 0.40, "ore")
 ADDON.state.dest = { map = 1429, x = 0.8, y = 0.5, title = "Baked transition test" }
 local bakedBuilt = ADDON:BuildRoute(true)
 check("baked crossing builds immediately", bakedBuilt == true)

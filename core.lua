@@ -1406,6 +1406,8 @@ local function ProjectOnCorridor(points, x, y)
                 t = t,
                 x = px,
                 y = py,
+                dx = x - px,
+                dy = y - py,
                 progress = progress + t * length,
             }
         end
@@ -1426,10 +1428,16 @@ function NodeTaxi:BuildCorridorLeg(leg)
     end
 
     local corridor = leg.corridorPoints
+    local zoneWidth, zoneHeight = self:GetZoneSize(leg.map)
     local candidates = {}
     for _, node in ipairs(self:NodeListForMap(leg.map)) do
         local projection = ProjectOnCorridor(corridor, node.x, node.y)
-        if projection.distance <= settings.corridor then
+        local offsetYards = projection.distance * 1000
+        if zoneWidth and zoneHeight then
+            offsetYards = math.sqrt(
+                (projection.dx * zoneWidth) ^ 2 + (projection.dy * zoneHeight) ^ 2)
+        end
+        if offsetYards <= settings.corridor then
             candidates[#candidates + 1] = {
                 node = node,
                 projection = projection,
@@ -1444,9 +1452,33 @@ function NodeTaxi:BuildCorridorLeg(leg)
         return a.projection.progress < b.projection.progress
     end)
 
+    -- Spread the picks through the zone instead of taking the first N near
+    -- the entrance. One candidate per equal progress band keeps Silverpine
+    -- from being represented only by its northern nodes.
     local selected = {}
-    for i = 1, math.min(#candidates, settings.maxNodes) do
-        selected[i] = candidates[i]
+    if #candidates <= settings.maxNodes then
+        for i = 1, #candidates do
+            selected[i] = candidates[i]
+        end
+    else
+        local totalProgress = candidates[#candidates].projection.progress
+        local bands = math.max(1, settings.maxNodes)
+        for band = 1, bands do
+            local low = (band - 1) / bands * totalProgress
+            local high = band / bands * totalProgress
+            local best
+            for _, candidate in ipairs(candidates) do
+                local progress = candidate.projection.progress
+                if progress >= low and (progress < high or band == bands) then
+                    if not best or candidate.projection.distance < best.projection.distance then
+                        best = candidate
+                    end
+                end
+            end
+            if best then
+                selected[#selected + 1] = best
+            end
+        end
     end
 
     if #selected == 0 then
@@ -1494,31 +1526,66 @@ function NodeTaxi:BuildCorridorLeg(leg)
         groupStart = groupEnd + 1
     end
 
-    -- The corridor is only the reference used to select and order nodes.
-    -- The drawn line is one forward chain: start -> nodes in corridor order
-    -- -> destination. No corridor vertices and no return-to-projection spurs.
-    local route = {}
-    if leg.startX and leg.startY then
-        route[#route + 1] = { x = leg.startX, y = leg.startY }
-    end
+    -- The visible line is one chain. Start from corridor progress order,
+    -- then run a bounded 2-opt pass to remove crossings and long backtracks;
+    -- endpoints stay fixed.
+    local chain = { { x = leg.startX, y = leg.startY } }
     for _, item in ipairs(ordered) do
-        route[#route + 1] = { x = item.node.x, y = item.node.y }
+        chain[#chain + 1] = { x = item.node.x, y = item.node.y, node = item.node }
     end
-    route[#route + 1] = { x = leg.destX, y = leg.destY }
+    chain[#chain + 1] = { x = leg.destX, y = leg.destY }
 
-    local length = 0
-    for i = 2, #route do
-        local dx, dy = route[i].x - route[i - 1].x, route[i].y - route[i - 1].y
-        length = length + math.sqrt(dx * dx + dy * dy)
+    local function chainLength(sequence)
+        local total = 0
+        for i = 2, #sequence do
+            local dx = sequence[i].x - sequence[i - 1].x
+            local dy = sequence[i].y - sequence[i - 1].y
+            total = total + math.sqrt(dx * dx + dy * dy)
+        end
+        return total
     end
+
+    local function reverseRange(sequence, first, last)
+        while first < last do
+            sequence[first], sequence[last] = sequence[last], sequence[first]
+            first, last = first + 1, last - 1
+        end
+    end
+
+    local bestLength = chainLength(chain)
+    for _ = 1, 3 do
+        local improved = false
+        for first = 2, #chain - 2 do
+            for last = first + 1, #chain - 1 do
+                reverseRange(chain, first, last)
+                local candidateLength = chainLength(chain)
+                if candidateLength + 1e-9 < bestLength then
+                    bestLength = candidateLength
+                    improved = true
+                else
+                    reverseRange(chain, first, last)
+                end
+            end
+        end
+        if not improved then
+            break
+        end
+    end
+
+    local length = bestLength
     local ddx, ddy = leg.destX - leg.startX, leg.destY - leg.startY
     local direct = math.sqrt(ddx * ddx + ddy * ddy) * 1000
 
+    ordered = {}
+    for i = 2, #chain - 1 do
+        ordered[#ordered + 1] = { node = chain[i].node }
+    end
+    leg.routePoints = chain
     leg.nodes = {}
     for _, item in ipairs(ordered) do
         leg.nodes[#leg.nodes + 1] = item.node
     end
-    leg.routePoints = route
+    leg.routePoints = chain
     leg.plan = {
         nodes = leg.nodes,
         length = length * 1000,

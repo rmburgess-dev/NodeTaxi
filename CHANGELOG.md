@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.4 - 2026-11-05
+
+- Fix corridor node filtering: normalized map distance was being compared
+  against a yard value, so a 300 yd setting effectively accepted the whole
+  zone. It now converts to yards before filtering.
+- Select one node per progress band instead of taking the first eight near
+  the entrance, so nodes are spread through the zone (Silverpine now gets
+  nodes along the whole southbound leg).
+- Run a bounded 2-opt pass on the selected nodes so the drawn line is one
+  efficient forward chain without crossings or backtracks.
+
 ## 0.9.3 - 2026-11-05
 
 - Make the drawn route one forward chain: start, selected nodes in corridor

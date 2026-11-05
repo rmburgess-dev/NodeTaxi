@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.5 - 2026-11-05
+
+- Draw every known node in each zone on the route as a small resource icon.
+  Selected route nodes remain bright and connected by the node-to-node line.
+- Add `/nt allnodes on|off` (default on) to show or hide the full node field.
+- Tracking filtering still applies, so a miner sees ore and a herbalist sees
+  herbs.
+
 ## 0.9.4 - 2026-11-05
 
 - Fix corridor node filtering: normalized map distance was being compared

@@ -618,6 +618,10 @@ if silverpineLeg and silverpineLeg.routePoints and silverpineLeg.nodes[1] then
     end
 end
 check("visible path detours through the node", routeTouchesNode)
+check("every known leg node is exposed", silverpineLeg and silverpineLeg.allNodes
+    and #silverpineLeg.allNodes >= #silverpineLeg.nodes,
+    silverpineLeg and silverpineLeg.allNodes and #silverpineLeg.allNodes)
+check("all-node display defaults on", ADDON.settings.allNodes == true)
 local corridorLegs = 0
 for _, leg in ipairs(bakedRoute and bakedRoute.legs or {}) do
     if leg.corridorPoints then corridorLegs = corridorLegs + 1 end

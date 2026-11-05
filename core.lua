@@ -27,6 +27,7 @@ local DEFAULTS = {
     logChat = true,   -- also print one line per gather/validation
     debug = false,
     welcome = true,
+    allNodes = true,  -- draw every known node in the route zones, not only selected
 }
 
 NodeTaxi.state = NodeTaxi.state or {
@@ -1429,8 +1430,10 @@ function NodeTaxi:BuildCorridorLeg(leg)
 
     local corridor = leg.corridorPoints
     local zoneWidth, zoneHeight = self:GetZoneSize(leg.map)
+    local allNodes = leg.allNodes or self:NodeListForMap(leg.map)
+    leg.allNodes = allNodes
     local candidates = {}
-    for _, node in ipairs(self:NodeListForMap(leg.map)) do
+    for _, node in ipairs(allNodes) do
         local projection = ProjectOnCorridor(corridor, node.x, node.y)
         local offsetYards = projection.distance * 1000
         if zoneWidth and zoneHeight then
@@ -1748,6 +1751,7 @@ function NodeTaxi:BuildRoute(announce)
             destX = planDest.x,
             destY = planDest.y,
             nodes = plan.nodes,
+            allNodes = nodes,
             plan = plan,
         } }
 
@@ -1772,12 +1776,13 @@ function NodeTaxi:BuildRoute(announce)
             local destX = edgeOut and edgeOut.fromX or dest.x
             local destY = edgeOut and edgeOut.fromY or dest.y
             local legPlan
+            local legNodes = self:NodeListForMap(mapID)
             local legWidth, legHeight = self:GetZoneSize(mapID)
             if legWidth then
                 legPlan = Route.Plan({
                     start = { x = startX, y = startY },
                     dest = { x = destX, y = destY },
-                    nodes = self:NodeListForMap(mapID),
+                    nodes = legNodes,
                     width = legWidth,
                     height = legHeight,
                     corridor = settings.corridor,
@@ -1793,6 +1798,7 @@ function NodeTaxi:BuildRoute(announce)
                 destX = destX,
                 destY = destY,
                 nodes = legPlan and legPlan.nodes or {},
+                allNodes = legNodes,
                 plan = legPlan,
             }
 
@@ -1808,6 +1814,7 @@ function NodeTaxi:BuildRoute(announce)
             destX = planDest.x,
             destY = planDest.y,
             nodes = plan.nodes,
+            allNodes = nodes,
             plan = plan,
         } }
     end
@@ -2416,6 +2423,7 @@ local function PrintHelp()
     Print("  /nt replan 30      yards moved before the remaining route is re-ordered (0 = off)")
     Print("  /nt ring 100       yards at which a node marker becomes a hollow ring (0 = off)")
     Print("  /nt auto on|off    rebuild when the arrow target changes")
+    Print("  /nt allnodes on|off show every known node in route zones")
     Print("  /nt kind auto|herb|ore|both  node filter; auto follows your tracking")
     Print("  /nt debug          diagnostic information")
     Print("  /nt learn herb|ore <spellID>  teach a gather spell by hand")
@@ -2426,9 +2434,9 @@ end
 local function PrintStatus()
     InitSettingsIfNeeded()
     local playerMap = NodeTaxi:GetPlayerZone()
-    Print(string.format("settings: corridor %.0f yd, max %.0f nodes, detour %.1fx, arrive %.0f yd, auto %s, kind %s, replan %.0f yd, ring %.0f yd",
+    Print(string.format("settings: corridor %.0f yd, max %.0f nodes, detour %.1fx, arrive %.0f yd, auto %s, allnodes %s, kind %s, replan %.0f yd, ring %.0f yd",
         settings.corridor, settings.maxNodes, settings.detour, settings.arrive,
-        settings.auto and "on" or "off", settings.kind, settings.replan, settings.ring))
+        settings.auto and "on" or "off", settings.allNodes and "on" or "off", settings.kind, settings.replan, settings.ring))
     Print(string.format("tracking: active %s, filter %s -> using %s",
         tostring(NodeTaxi:DetectTracking() or "none"), settings.kind, NodeTaxi:GetEffectiveKind()))
     if C_Minimap and C_Minimap.GetNumTrackingTypes and C_Minimap.GetTrackingInfo then
@@ -2807,6 +2815,18 @@ local function HandleCommand(message)
                 or "ring markers off.")
         else
             Print("usage: /nt ring 100  (0-500 yards, 0 = off)")
+        end
+
+    elseif command == "allnodes" then
+        local value = OnOff(rest:lower())
+        if value == nil then
+            Print("usage: /nt allnodes on|off")
+        else
+            settings.allNodes = value
+            if state.route then
+                NodeTaxi:Redraw()
+            end
+            Print("all node icons " .. (value and "on" or "off") .. ".")
         end
 
     elseif command == "auto" then

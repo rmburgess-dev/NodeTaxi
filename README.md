@@ -194,6 +194,13 @@ connector to the player/target. Zones without a generated corridor fall back to
 transition points and node icons only — no invented straight line. The
 corridor spine itself is never painted.
 
+### All node icons
+
+By default every known node in the zones on the route is drawn as a small,
+faint resource icon. Selected route nodes stay bright and connected by the
+dashed journey line. Toggle the full field with `/nt allnodes off` or back on
+with `/nt allnodes on`. Tracking filtering still applies (`/nt kind auto`).
+
 ### Baked Forever snapshot (included)
 
 `data.lua` is generated from the **Forever** tables of *GatherMate2 Data

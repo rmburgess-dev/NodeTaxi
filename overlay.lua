@@ -488,6 +488,28 @@ function NodeTaxi:RedrawWorld()
         DrawDashes(worldLines, frame, a.x, a.y, b.x, b.y, 9, 7, thickness, color)
     end
 
+    -- Every known node in the route zones, so the whole resource field is
+    -- visible. Selected route nodes are drawn brightly below/above this.
+    if self.settings and self.settings.allNodes and route.legs then
+        local drawn = {}
+        for _, leg in ipairs(route.legs) do
+            local selected = {}
+            for _, node in ipairs(leg.nodes or {}) do
+                selected[string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))] = true
+            end
+            for _, node in ipairs(leg.allNodes or {}) do
+                local key = string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))
+                if not selected[key] and not drawn[key] then
+                    local nx, ny = ToScreen(leg.map, node.x, node.y)
+                    if nx then
+                        drawn[key] = true
+                        DrawWorldIcon(worldMarkers, frame, nx, ny, 8, NodeIcon(node), 0.45)
+                    end
+                end
+            end
+        end
+    end
+
     local ringDistance = (self.settings and self.settings.ring) or 0
     local pulse = 0.65 + 0.35 * sin(GetTime() * 4)
 

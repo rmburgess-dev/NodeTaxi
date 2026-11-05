@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.12 - 2026-11-05
+
+- Set the default node deviation/sweep cap to **100 yards**, matching the
+  minimap's typical 80-100 yard render band.
+- Migrate the old 75-yard default for existing installs; custom values are
+  preserved.
+- Keep `/nt ring 100` as the close-marker threshold.
+
 ## 0.9.11 - 2026-11-05
 
 - Draw the Tirisfal entry leg even when no resource node fits the 75-yard

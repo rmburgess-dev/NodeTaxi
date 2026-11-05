@@ -628,6 +628,8 @@ check("every known leg node is exposed", silverpineLeg and silverpineLeg.allNode
     and #silverpineLeg.allNodes >= #silverpineLeg.nodes,
     silverpineLeg and silverpineLeg.allNodes and #silverpineLeg.allNodes)
 check("all-node display defaults on", ADDON.settings.allNodes == true)
+check("node deviation defaults to 100 yards", ADDON.settings.spur == 100,
+    ADDON.settings.spur)
 local corridorLegs = 0
 for _, leg in ipairs(bakedRoute and bakedRoute.legs or {}) do
     if leg.corridorPoints then corridorLegs = corridorLegs + 1 end

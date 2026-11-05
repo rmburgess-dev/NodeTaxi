@@ -28,7 +28,7 @@ local DEFAULTS = {
     debug = false,
     welcome = true,
     allNodes = true,  -- draw every known node under the displayed map
-    spur = 75,       -- max yards a selected node may pull away from the reference
+    spur = 100,      -- max yards a selected node may pull away from the reference
 }
 
 NodeTaxi.nodeRevision = NodeTaxi.nodeRevision or 0
@@ -283,7 +283,7 @@ local function InitDB()
     NodeTaxiDB = NodeTaxiDB or {}
     db = NodeTaxiDB
     local oldVersion = db.version or 1
-    db.version = 3
+    db.version = 4
 
     db.settings = db.settings or {}
     for key, value in pairs(DEFAULTS) do
@@ -296,6 +296,12 @@ local function InitDB()
     -- player's active tracking now; an explicit herb/ore choice is kept.
     if oldVersion < 2 and db.settings.kind == "both" then
         db.settings.kind = "auto"
+    end
+
+    -- 0.9.8-0.9.11 shipped a 75-yard spur default. The minimap only renders
+    -- around 80-100 yards, so use the full 100-yard band by default.
+    if oldVersion < 4 and db.settings.spur == 75 then
+        db.settings.spur = 100
     end
 
     db.nodes = db.nodes or {}

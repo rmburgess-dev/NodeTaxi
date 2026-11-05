@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.11 - 2026-11-05
+
+- Draw the Tirisfal entry leg even when no resource node fits the 75-yard
+  sweep band. First and last legs always retain a visible route line.
+- This fixes the empty map when the current zone happened to select zero
+  nodes.
+
 ## 0.9.10 - 2026-11-05
 
 - Remove the remaining blue transition/gap lines. The map now draws only the

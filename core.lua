@@ -1491,13 +1491,48 @@ function NodeTaxi:BuildCorridorLeg(leg)
 
     if #selected == 0 then
         leg.nodes = {}
-        leg.routePoints = nil
         leg.plan = {
             nodes = {},
             length = 0,
             direct = 0,
             inCorridor = #candidates,
         }
+        if leg.isFirst or leg.isLast then
+            -- Entry and exit legs still need a visible route even when no
+            -- resource node fell inside the 75-yard sweep band.
+            local route = { { x = leg.startX, y = leg.startY } }
+            if leg.corridorStart then
+                local last = route[#route]
+                if math.abs(last.x - leg.corridorStart.x) > 0.0001
+                    or math.abs(last.y - leg.corridorStart.y) > 0.0001 then
+                    route[#route + 1] = { x = leg.corridorStart.x, y = leg.corridorStart.y }
+                end
+            end
+            for _, point in ipairs(corridor) do
+                local last = route[#route]
+                if math.abs(last.x - point.x) > 0.0001 or math.abs(last.y - point.y) > 0.0001 then
+                    route[#route + 1] = { x = point.x, y = point.y }
+                end
+            end
+            if leg.corridorEnd then
+                local last = route[#route]
+                if math.abs(last.x - leg.corridorEnd.x) > 0.0001
+                    or math.abs(last.y - leg.corridorEnd.y) > 0.0001 then
+                    route[#route + 1] = { x = leg.corridorEnd.x, y = leg.corridorEnd.y }
+                end
+            end
+            route[#route + 1] = { x = leg.destX, y = leg.destY }
+            local length = 0
+            for i = 2, #route do
+                local dx, dy = route[i].x - route[i - 1].x, route[i].y - route[i - 1].y
+                length = length + math.sqrt(dx * dx + dy * dy)
+            end
+            leg.routePoints = route
+            leg.plan.length = length * 1000
+            leg.plan.direct = math.sqrt((leg.destX - leg.startX) ^ 2 + (leg.destY - leg.startY) ^ 2) * 1000
+        else
+            leg.routePoints = nil
+        end
         return true
     end
 
@@ -1622,6 +1657,8 @@ end
 function NodeTaxi:AttachCorridors(legs)
     local attached = 0
     for i, leg in ipairs(legs) do
+        leg.isFirst = (i == 1)
+        leg.isLast = (i == #legs)
         local path, startPoint, endPoint, exactStart, exactEnd = self:FindCorridor(
             leg.map, leg.startX, leg.startY, leg.destX, leg.destY)
         if path then

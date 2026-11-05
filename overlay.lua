@@ -311,8 +311,8 @@ function NodeTaxi:EnsureWorldOverlay()
 
     local frame = CreateFrame("Frame", "NodeTaxiWorldOverlay", canvas)
     frame:SetAllPoints(canvas)
-    frame:SetFrameStrata("HIGH")
-    frame:SetFrameLevel(canvas:GetFrameLevel() + 5)
+    frame:SetFrameStrata("TOOLTIP")
+    frame:SetFrameLevel(canvas:GetFrameLevel() + 50)
     worldFrame = frame
     self.worldOverlaySource = source
 
@@ -360,7 +360,7 @@ function NodeTaxi:RedrawWorld()
 
     local route = self.state.route
     local worldMap = _G.WorldMapFrame
-    if not route or not worldMap or not worldMap:IsShown() then
+    if not worldMap or not worldMap:IsShown() then
         return
     end
 
@@ -373,6 +373,37 @@ function NodeTaxi:RedrawWorld()
 
     local function ToScreen(mapID, x, y)
         return NodeTaxi:MapPointToCanvas(mapID, x, y, topMapID, width, height)
+    end
+
+    -- Every known node under the map currently open, independent of route and
+    -- exploration. This also works with no active route.
+    if self.settings and self.settings.allNodes then
+        local selected = {}
+        if route then
+            for _, leg in ipairs(route.legs or {}) do
+                for _, node in ipairs(leg.nodes or {}) do
+                    selected[string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))] = true
+                end
+            end
+        end
+
+        local drawn = {}
+        for _, zone in ipairs(self:NodesForTopMap(topMapID)) do
+            for _, node in ipairs(zone.nodes) do
+                local key = string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))
+                if not selected[key] and not drawn[key] then
+                    local nx, ny = ToScreen(zone.map, node.x, node.y)
+                    if nx then
+                        drawn[key] = true
+                        DrawWorldIcon(worldMarkers, frame, nx, ny, 8, NodeIcon(node), 0.45)
+                    end
+                end
+            end
+        end
+    end
+
+    if not route then
+        return
     end
 
     local points = {}
@@ -486,28 +517,6 @@ function NodeTaxi:RedrawWorld()
             thickness = 2.5
         end
         DrawDashes(worldLines, frame, a.x, a.y, b.x, b.y, 9, 7, thickness, color)
-    end
-
-    -- Every known node in the route zones, so the whole resource field is
-    -- visible. Selected route nodes are drawn brightly below/above this.
-    if self.settings and self.settings.allNodes and route.legs then
-        local drawn = {}
-        for _, leg in ipairs(route.legs) do
-            local selected = {}
-            for _, node in ipairs(leg.nodes or {}) do
-                selected[string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))] = true
-            end
-            for _, node in ipairs(leg.allNodes or {}) do
-                local key = string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))
-                if not selected[key] and not drawn[key] then
-                    local nx, ny = ToScreen(leg.map, node.x, node.y)
-                    if nx then
-                        drawn[key] = true
-                        DrawWorldIcon(worldMarkers, frame, nx, ny, 8, NodeIcon(node), 0.45)
-                    end
-                end
-            end
-        end
     end
 
     local ringDistance = (self.settings and self.settings.ring) or 0
@@ -733,6 +742,7 @@ function NodeTaxi:OverlayDebugInfo()
     return {
         world = worldFrame and ("ready via " .. tostring(self.worldOverlaySource)) or "not created",
         minimap = minimapFrame and "ready" or "not created",
+        markers = #worldMarkers,
     }
 end
 

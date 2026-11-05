@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.6 - 2026-11-05
+
+- Show all known nodes for the whole displayed map, not only the current zone
+  or route zones: zone view shows that zone, continent view every zone under
+  it, and the world view every known zone.
+- Nodes are read directly from seed/learned data with no exploration check, so
+  unexplored zones still show their resource field.
+- Raise the world overlay above the fog/exploration layer.
+- Show the node field even when there is no active route.
+- Cache the per-map node lists and invalidate them when nodes change.
+
 ## 0.9.5 - 2026-11-05
 
 - Draw every known node in each zone on the route as a small resource icon.

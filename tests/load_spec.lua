@@ -114,6 +114,12 @@ _G.C_Map = {
         end
         return nil
     end,
+    GetMapChildrenInfo = function(mapID)
+        if mapID == 1419 then
+            return { { mapID = 1420 }, { mapID = 1429 } }
+        end
+        return {}
+    end,
     GetMapInfoAtPosition = function(mapID, x, y)
         if mapID == 1419 then
             if x < 0.5 then
@@ -715,6 +721,22 @@ check("unknown crossing says so", unknownMessage:find("no known crossing", 1, tr
 
 playerZoneMap = 1429
 playerZoneX, playerZoneY = 0.5, 0.5
+
+-- All known nodes are visible even with no route and with the map unexplored.
+local savedRoute = ADDON.state.route
+ADDON.state.route = nil
+WorldMapFrame.IsShown = function() return true end
+WorldMapFrame.GetMapID = function() return 1419 end
+C_Map.GetMapRectOnMap = function(child, parent)
+    if parent == 1419 then
+        return 0.0, 1.0, 0.0, 1.0
+    end
+    return nil
+end
+ADDON:RedrawWorld()
+check("nodes visible without a route", ADDON:OverlayDebugInfo().markers > 0,
+    ADDON:OverlayDebugInfo().markers)
+ADDON.state.route = savedRoute
 
 -- Save/load round trip of the settings table.
 check("settings persisted in memory", _G.NodeTaxiDB.settings.corridor == 250)

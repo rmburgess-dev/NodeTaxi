@@ -196,10 +196,13 @@ corridor spine itself is never painted.
 
 ### All node icons
 
-By default every known node in the zones on the route is drawn as a small,
-faint resource icon. Selected route nodes stay bright and connected by the
-dashed journey line. Toggle the full field with `/nt allnodes off` or back on
-with `/nt allnodes on`. Tracking filtering still applies (`/nt kind auto`).
+By default every known node under the map you are viewing is drawn as a small,
+faint resource icon: zone view shows that zone, continent view every zone
+under it, and the world view every known zone. This does not depend on the zone
+being explored and works with no active route. Selected route nodes stay bright
+and connected by the dashed journey line. Toggle the full field with
+`/nt allnodes off` or back on with `/nt allnodes on`. Tracking filtering still
+applies (`/nt kind auto`).
 
 ### Baked Forever snapshot (included)
 

@@ -30,6 +30,8 @@ local DEFAULTS = {
     allNodes = true,  -- draw every known node in the route zones, not only selected
 }
 
+NodeTaxi.nodeRevision = NodeTaxi.nodeRevision or 0
+
 NodeTaxi.state = NodeTaxi.state or {
     dest = nil,
     route = nil,
@@ -418,6 +420,7 @@ function NodeTaxi:AddNode(mapID, x, y, kind, quiet)
     if not (mapID and x and y) then
         return nil, false
     end
+    NodeTaxi.nodeRevision = (NodeTaxi.nodeRevision or 0) + 1
 
     local list = db.nodes[mapID]
     if not list then
@@ -1620,6 +1623,89 @@ function NodeTaxi:AttachCorridors(legs)
         end
     end
     return attached
+end
+
+function NodeTaxi:ZonesUnderMap(mapID)
+    local zones, seen = {}, {}
+    local function walk(id)
+        if not id or seen[id] then
+            return
+        end
+        seen[id] = true
+        local info = GetMapInfoRaw(id)
+        if info and info.mapType == 3 then
+            zones[#zones + 1] = id
+            return
+        end
+        if C_Map and C_Map.GetMapChildrenInfo then
+            local ok, children = pcall(C_Map.GetMapChildrenInfo, id, nil, true)
+            if ok and type(children) == "table" then
+                for _, child in ipairs(children) do
+                    if type(child) == "table" and child.mapID then
+                        walk(child.mapID)
+                    end
+                end
+            end
+        end
+    end
+    walk(mapID)
+    return zones
+end
+
+function NodeTaxi:NodesForTopMap(mapID)
+    InitSettingsIfNeeded()
+    local key = table.concat({
+        tostring(mapID),
+        self:GetEffectiveKind(),
+        tostring(self.nodeRevision or 0),
+        self.SeedData and self.SeedData.version or "",
+    }, ":")
+    if self.worldNodeCache and self.worldNodeCache.key == key then
+        return self.worldNodeCache.lists
+    end
+
+    local zones = self:ZonesUnderMap(mapID)
+    if #zones == 0 then
+        -- Fallback for clients without GetMapChildrenInfo: derive the zones
+        -- from the seed/learned data and their parent chain.
+        local info = GetMapInfoRaw(mapID)
+        if info and info.mapType ~= 3 then
+            local seen = {}
+            local function consider(zone)
+                if seen[zone] then
+                    return
+                end
+                seen[zone] = true
+                local current = zone
+                for _ = 1, 6 do
+                    if current == mapID then
+                        zones[#zones + 1] = zone
+                        return
+                    end
+                    local mapInfo = GetMapInfoRaw(current)
+                    current = mapInfo and mapInfo.parentMapID
+                    if not current then
+                        return
+                    end
+                end
+            end
+            if self.SeedData then
+                for zone in pairs(self.SeedData.herbs or {}) do consider(zone) end
+                for zone in pairs(self.SeedData.mines or {}) do consider(zone) end
+            end
+            for zone in pairs(db.nodes or {}) do consider(zone) end
+        end
+    end
+
+    local lists = {}
+    for _, zone in ipairs(zones) do
+        local nodes = self:NodeListForMap(zone)
+        if #nodes > 0 then
+            lists[#lists + 1] = { map = zone, nodes = nodes }
+        end
+    end
+    self.worldNodeCache = { key = key, lists = lists }
+    return lists
 end
 
 function NodeTaxi:BuildRoute(announce)
@@ -2886,6 +2972,7 @@ local function HandleCommand(message)
     elseif command == "clear" then
         if rest:lower() == "yes" then
             db.nodes = {}
+            NodeTaxi.nodeRevision = (NodeTaxi.nodeRevision or 0) + 1
             NodeTaxi:ClearRoute(nil, true)
             Print("all learned/imported nodes deleted; the baked snapshot stays.")
         else

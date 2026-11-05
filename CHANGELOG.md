@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.19 - 2026-11-05
+
+- Allow rolling re-planning again once a completed node frees a slot, without
+  reshuffling a still-full leg. The route stays stable while full and can add
+  a new nearby node after a pickup.
+- Add `docs/ROUTE_EVALUATION.md` with the multi-waypoint comparison and
+  max-node tradeoff used to choose the current defaults.
+
 ## 0.9.18 - 2026-11-05
 
 - Draw a fallback node line for legs with no generated corridor, including

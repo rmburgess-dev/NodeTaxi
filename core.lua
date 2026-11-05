@@ -2327,7 +2327,8 @@ function NodeTaxi:RefreshCurrentLeg()
     if not mapID or mapID ~= leg.map or not px then
         return false
     end
-    if #route.nodes >= settings.maxNodes then
+    local remainingNodes = #route.nodes - math.max(0, (route.index or 1) - 1)
+    if remainingNodes >= settings.maxNodes then
         -- Already at the per-leg budget. Keep the chosen route stable instead
         -- of swapping nodes as the player moves.
         return false

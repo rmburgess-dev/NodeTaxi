@@ -1485,12 +1485,11 @@ function NodeTaxi:BuildCorridorLeg(leg)
             offsetYards = math.sqrt(
                 (projection.dx * zoneWidth) ^ 2 + (projection.dy * zoneHeight) ^ 2)
         end
-        if offsetYards <= maxOffset then
-            candidates[#candidates + 1] = {
-                node = node,
-                projection = projection,
-            }
-        end
+        candidates[#candidates + 1] = {
+            node = node,
+            projection = projection,
+            offsetYards = offsetYards,
+        }
     end
     table.sort(candidates, function(a, b)
         return a.projection.progress < b.projection.progress
@@ -1508,7 +1507,9 @@ function NodeTaxi:BuildCorridorLeg(leg)
     while selectedCount < settings.maxNodes do
         local startIndex
         for i = 1, #candidates do
-            if not used[i] and candidates[i].projection.progress >= cursorProgress - 1e-9 then
+            if not used[i]
+                and candidates[i].offsetYards <= maxOffset
+                and candidates[i].projection.progress >= cursorProgress - 1e-9 then
                 startIndex = i
                 break
             end

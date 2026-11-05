@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.14 - 2026-11-05
+
+- Fix the branch pool: once a branch starts near the corridor, every unvisited
+  node within 100 yards of the current node is eligible, even if it is farther
+  than 100 yards from the corridor itself.
+- Branch starts still require a node within the corridor deviation limit.
+- This lets a cluster extend away from the road until no nearby node remains,
+  then merge back.
+
 ## 0.9.13 - 2026-11-05
 
 - Replace one-node-per-band selection with a branch walk: after reaching a

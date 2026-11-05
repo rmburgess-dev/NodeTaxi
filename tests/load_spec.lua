@@ -643,10 +643,11 @@ local clusterLeg = {
         { x = 0.56, y = 0.40, kind = "ore", nodeID = 201 },
         { x = 0.565, y = 0.405, kind = "ore", nodeID = 201 },
         { x = 0.555, y = 0.395, kind = "ore", nodeID = 201 },
+        { x = 0.560, y = 0.300, kind = "ore", nodeID = 201 },
     },
 }
 ADDON:BuildCorridorLeg(clusterLeg)
-check("branch takes the whole nearby cluster", #clusterLeg.nodes == 3, #clusterLeg.nodes)
+check("branch takes the whole nearby cluster", #clusterLeg.nodes == 4, #clusterLeg.nodes)
 check("all-node display defaults on", ADDON.settings.allNodes == true)
 check("node deviation defaults to 100 yards", ADDON.settings.spur == 100,
     ADDON.settings.spur)

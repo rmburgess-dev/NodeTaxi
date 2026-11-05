@@ -214,6 +214,39 @@ NodeTaxi.NodeIcon = NodeIcon
 -- Hollow rings mark the expected node position once you are close. Leaving
 -- the centre empty is the point: the game's own tracking dot/minimap icon can
 -- be seen inside the ring, so you can tell whether a node is really there.
+local function SmoothPath(points, steps)
+    if not points or #points < 3 then
+        return points
+    end
+    local function at(index)
+        if index < 1 then
+            return points[1]
+        elseif index > #points then
+            return points[#points]
+        end
+        return points[index]
+    end
+    local out = { points[1] }
+    for index = 1, #points - 1 do
+        local p0, p1, p2, p3 = at(index - 1), at(index), at(index + 1), at(index + 2)
+        for step = 1, steps do
+            local t = step / steps
+            if t < 1 then
+                local t2, t3 = t * t, t * t * t
+                local x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t
+                    + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2
+                    + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3)
+                local y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t
+                    + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2
+                    + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+                out[#out + 1] = { x = x, y = y }
+            end
+        end
+    end
+    out[#out + 1] = { x = points[#points].x, y = points[#points].y }
+    return out
+end
+
 local function DrawWorldRing(pool, parent, x, y, radius, color, thickness)
     local segments = 12
     for i = 0, segments - 1 do
@@ -486,7 +519,11 @@ function NodeTaxi:RedrawWorld()
         end
     end
 
+    pathPoints = SmoothPath(pathPoints, 3)
+
     local pathColor = route.preview and COLORS.preview or COLORS.path
+    pathPoints = SmoothPath(pathPoints, 2)
+
     for i = 2, #pathPoints do
         local a, b = pathPoints[i - 1], pathPoints[i]
         local color = pathColor
@@ -685,6 +722,8 @@ function NodeTaxi:RedrawMinimap()
             position = position + 9
         end
     end
+
+    pathPoints = SmoothPath(pathPoints, 2)
 
     for i = 2, #pathPoints do
         local a, b = pathPoints[i - 1], pathPoints[i]

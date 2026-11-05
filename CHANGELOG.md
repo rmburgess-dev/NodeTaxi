@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.16 - 2026-11-05
+
+- Smooth the displayed route polyline with Catmull-Rom interpolation on the
+  world map and minimap, so corridor bends and branch joins are curves instead
+  of right angles.
+- Rendering-only change: node selection, branch logic, and detour limits are
+  unchanged.
+
 ## 0.9.15 - 2026-11-05
 
 - Replace first-come branch selection with cluster scoring: nodes within the

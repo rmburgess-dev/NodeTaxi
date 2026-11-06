@@ -1,3 +1,23 @@
+# Build outputs
 dist/
 *.zip
+
+# OS/editor/backup files
 .DS_Store
+Thumbs.db
+Desktop.ini
+*.bak
+*.tmp
+*.log
+*.out
+*.swp
+*~
+.vscode/
+.idea/
+
+# Python tooling
+__pycache__/
+*.py[cod]
+.venv/
+.luacheckcache
+*.luac

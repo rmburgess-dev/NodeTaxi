@@ -4,7 +4,7 @@
 
 - **Name:** NodeTaxi
 - **Slug:** nodetaxi
-- **Summary:** Tracking-aware gathering routes for WoW Forever: dashed taxi paths through herb/ore nodes between you and your TomTom waypoint.
+- **Summary:** Tracking-aware gathering routes for WoW Forever: a dashed TomTom-following path with short side-trips through nearby herbs and ore. 23,827 baked nodes, GatherMate2-style icons.
 - **Category:** Map & Minimap
 - **Game version:** WoW Forever 1.60.1 (Interface 16001)
 - **License:** Other / custom — point at the repository `LICENSE`. The code is
@@ -17,7 +17,7 @@
 
 - **Upload:** `dist/NodeTaxi-0.9.26.zip`
 - **Project icon:** `docs/icon-256.png` (or `docs/icon-512.png`)
-- **Description:** paste `docs/CURSEFORGE.md`
+- **Description:** paste `docs/CURSEFORGE.md` (already written for 0.9.26)
 - **Release type:** Beta (first public release, Forever data snapshot)
 
 ## Upload steps
@@ -49,7 +49,7 @@ lua tests/seed_spec.lua
 python3 tools/package.py
 ```
 
-Expected archive: `NodeTaxi/NodeTaxi.toc` at the top level, 50 files, no
+Expected archive: `NodeTaxi/NodeTaxi.toc` at the top level, 51 files, no
 `tests/`, `tools/`, `docs/`, `.git`, or `.pkgmeta`.
 
 ## Third-party content note

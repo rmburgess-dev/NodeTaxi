@@ -487,6 +487,18 @@ function NodeTaxi:NodeListForMap(mapID)
     InitSettingsIfNeeded()
 
     local filter = self:GetEffectiveKind()
+    local cacheKey = table.concat({
+        tostring(mapID),
+        filter,
+        tostring(self.nodeRevision or 0),
+        self.SeedData and self.SeedData.version or "",
+    }, ":")
+    self.nodeListCache = self.nodeListCache or {}
+    local cachedList = self.nodeListCache[mapID]
+    if cachedList and cachedList.key == cacheKey then
+        return cachedList.nodes
+    end
+
     local function include(kind)
         return filter == "both"
             or kind == filter
@@ -515,6 +527,7 @@ function NodeTaxi:NodeListForMap(mapID)
     local seed = self.SeedData
     local width, height = self:GetZoneSize(mapID)
     if not (seed and width and height) then
+        self.nodeListCache[mapID] = { key = cacheKey, nodes = result }
         return result
     end
 
@@ -634,6 +647,7 @@ function NodeTaxi:NodeListForMap(mapID)
     mergeSeed("herb", seed.herbs)
     mergeSeed("ore", seed.mines)
 
+    self.nodeListCache[mapID] = { key = cacheKey, nodes = result }
     return result
 end
 
@@ -3482,6 +3496,7 @@ driver:RegisterEvent("MINIMAP_UPDATE_TRACKING")
 
 local elapsedSinceTick = 0
 local elapsedSincePosition = 0
+local elapsedSinceMinimap = 0
 driver:SetScript("OnUpdate", function(_, elapsed)
     if db then
         elapsedSincePosition = elapsedSincePosition + elapsed
@@ -3500,6 +3515,14 @@ driver:SetScript("OnUpdate", function(_, elapsed)
         end
     end
 
+    elapsedSinceMinimap = elapsedSinceMinimap + elapsed
+    if elapsedSinceMinimap >= 0.05 then
+        elapsedSinceMinimap = 0
+        if NodeTaxi.RedrawMinimap and Minimap and Minimap:IsShown() then
+            NodeTaxi:RedrawMinimap()
+        end
+    end
+
     if not state.route then
         return
     end
@@ -3508,9 +3531,6 @@ driver:SetScript("OnUpdate", function(_, elapsed)
     if elapsedSinceTick >= 0.35 then
         elapsedSinceTick = 0
         NodeTaxi:Tick()
-        if NodeTaxi.RedrawMinimap then
-            NodeTaxi:RedrawMinimap()
-        end
     end
 end)
 

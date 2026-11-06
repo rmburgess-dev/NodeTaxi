@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.26 - 2026-11-05
+
+- Raise minimap redraw from every 0.35 s (~3 FPS) to every 0.05 s (~20 FPS).
+- Keep minimap redraws running without an active route, so the all-node field
+  no longer freezes.
+- Cache per-zone node lists and world-coordinate conversions to avoid rebuilding
+  the data set every frame.
+- Leave the world-map redraw cadence unchanged.
+
 ## 0.9.25 - 2026-11-05
 
 - Fix nearby-node markers: every known node within `/nt ring` now switches to

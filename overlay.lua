@@ -656,6 +656,26 @@ function NodeTaxi:RedrawMinimap()
         return (dx / radius) * halfWidth, -(dy / radius) * halfHeight
     end
 
+    self.minimapWorldCache = self.minimapWorldCache or {}
+    local zoneCache = self.minimapWorldCache[playerMap]
+    if not zoneCache then
+        zoneCache = {}
+        self.minimapWorldCache[playerMap] = zoneCache
+    end
+    local function NodeWorld(x, y, mapID)
+        local key = string.format("%.4f,%.4f,%s", x, y, tostring(mapID))
+        local cached = zoneCache[key]
+        if cached then
+            return cached.x, cached.y, cached.instance
+        end
+        local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone, hbd, x, y, mapID)
+        if worldOk and wx then
+            zoneCache[key] = { x = wx, y = wy, instance = instance }
+            return wx, wy, instance
+        end
+        return nil
+    end
+
     local function Inside(x, y)
         return (x * x + y * y) <= maxRadius * maxRadius
     end
@@ -679,9 +699,8 @@ function NodeTaxi:RedrawMinimap()
         for _, node in ipairs(self:NodeListForMap(playerMap)) do
             local key = string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))
             if not selected[key] then
-                local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone,
-                    hbd, node.x, node.y, playerMap)
-                if worldOk and wx and instance == playerInstance then
+                local wx, wy, instance = NodeWorld(node.x, node.y, playerMap)
+                if wx and instance == playerInstance then
                     local u, v = ToMinimap(wx, wy)
                     local screenDistance = sqrt(u * u + v * v)
                     local alpha = 1
@@ -718,9 +737,8 @@ function NodeTaxi:RedrawMinimap()
     for i = route.index or 1, #route.nodes do
         local node = route.nodes[i]
         if (node.map or route.map) == route.map then
-            local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone,
-                hbd, node.x, node.y, node.map or route.map)
-            if worldOk and wx and instance == playerInstance then
+            local wx, wy, instance = NodeWorld(node.x, node.y, node.map or route.map)
+            if wx and instance == playerInstance then
                 local u, v = ToMinimap(wx, wy)
                 local dx, dy = playerX - wx, playerY - wy
                 points[#points + 1] = {
@@ -735,9 +753,8 @@ function NodeTaxi:RedrawMinimap()
     end
 
     if route.dest and route.dest.map == route.map then
-        local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone,
-            hbd, route.dest.x, route.dest.y, route.dest.map)
-        if worldOk and wx and instance == playerInstance then
+        local wx, wy, instance = NodeWorld(route.dest.x, route.dest.y, route.dest.map)
+        if wx and instance == playerInstance then
             local u, v = ToMinimap(wx, wy)
             points[#points + 1] = { x = u, y = v, dest = true }
         end
@@ -747,9 +764,8 @@ function NodeTaxi:RedrawMinimap()
     local currentLeg = route.legs and route.legs[1]
     if currentLeg and currentLeg.routePoints then
         for _, routePoint in ipairs(currentLeg.routePoints) do
-            local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone,
-                hbd, routePoint.x, routePoint.y, currentLeg.map)
-            if worldOk and wx and instance == playerInstance then
+            local wx, wy, instance = NodeWorld(routePoint.x, routePoint.y, currentLeg.map)
+            if wx and instance == playerInstance then
                 local u, v = ToMinimap(wx, wy)
                 pathPoints[#pathPoints + 1] = { x = u, y = v }
             end

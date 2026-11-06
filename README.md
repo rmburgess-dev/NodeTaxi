@@ -69,10 +69,12 @@ The page includes routing limits, tracking filter, all-node display, ring
 distance, automatic-update behavior, quiet chat, and action buttons for route
 build/clear, preview, GatherMate2 import and reset.
 
-Defaults are quiet: automatic node-reached, crossing, gather and route-summary
-messages are suppressed. Manual `/nt` commands still respond. The route updates
-when the TomTom target changes; set `/nt replan 30` for optional rolling updates
-while moving.
+Defaults are quiet for routine events: automatic node-reached, crossing and
+gather messages are suppressed. One short **route updated** line still confirms
+each automatic target/zone rebuild; turn that off with the settings-page
+checkbox if desired. Manual `/nt` commands still respond. The route updates when
+the TomTom target changes; set `/nt replan 30` for optional rolling updates while
+moving.
 
 ## Quick test (no farming required)
 

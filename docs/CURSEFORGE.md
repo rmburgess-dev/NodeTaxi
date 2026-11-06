@@ -25,7 +25,7 @@ It is designed for players who want to keep moving toward a destination while pi
 - **Forward-moving route shape.** The visible line is smoothed and follows the corridor. It does not paint a separate corridor spine or blue transition bars.
 - **Stable while moving.** A full leg keeps its selected nodes instead of reshuffling as you walk. When a pickup frees a slot, the rolling re-plan can add a newly nearby node.
 - **In-game settings page.** Configure routing, display, tracking and quiet chat at **Settings → AddOns → NodeTaxi**, or open it with `/nt options`.
-- **Quiet by default.** Automatic node-reached, crossing, gather and route-summary messages are suppressed. The route updates when the TomTom target changes; enable optional rolling updates with `/nt replan 30`.
+- **Quiet by default.** Automatic node-reached, crossing and gather messages are suppressed, but one short **route updated** line still confirms each automatic target/zone rebuild. The route updates when the TomTom target changes; enable optional rolling updates with `/nt replan 30`.
 - **Learns from you.** Successful Herb Gathering and Mining casts are remembered. `/nt import gathermate2` imports local GatherMate2 data, and `/nt here` records a manual node.
 
 ### How the route is built
@@ -43,7 +43,7 @@ The default limits are:
 - 4 nodes per nearby cluster
 - 8 selected nodes per leg
 - Rolling re-plan off by default (updates when the TomTom target changes)
-- Automatic chat quiet by default
+- Routine automatic chat quiet; one route-update line remains
 - 100-yard ring distance
 
 All of these are adjustable in game.
@@ -177,7 +177,7 @@ TomTom (Cladhaire, Ludovicus), HereBeDragons (Nevcairiel), GatherMate2 and Gathe
 
 **License:** NodeTaxi code is MIT. Baked data and artwork retain their third-party terms; see `LICENSE`, `LICENSE-GPL-3.0.txt` and `ATTRIBUTION.md` in the repository.
 
-**Current release:** 0.9.27.
+**Current release:** 0.9.28.
 
 ## Deutsch
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.28 - 2026-11-05
+
+- Keep one short “route updated: N nodes, Z zones” line for automatic
+  TomTom-target and zone rebuilds, so quiet mode does not hide that the route
+  actually changed. Routine node/gather/crossing messages stay quiet.
+- Add a one-second TomTom target watcher as a fallback if the callback is
+  missed.
+- Add a settings-page checkbox for the short route-update line.
+- Add regression coverage for automatic target updates with the quiet defaults.
+
 ## 0.9.27 - 2026-11-05
 
 - Add a native **Settings → AddOns → NodeTaxi** page with routing, display,

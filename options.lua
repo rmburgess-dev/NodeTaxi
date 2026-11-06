@@ -101,8 +101,10 @@ function NodeTaxi:BuildOptions()
     addHeader(category, "Display")
     addCheckbox(category, "allNodes", "Show every known node",
         "Draws the full known-node field on the world map and minimap. Turn off for a route-only view.")
-    addCheckbox(category, "quiet", "Quiet automatic chat",
-        "Suppresses automatic node-reached, crossing, gather and route notices. Manual /nt commands still respond.")
+    addCheckbox(category, "quiet", "Quiet routine automatic chat",
+        "Suppresses automatic node-reached, crossing and gather messages. Manual /nt commands and the short route-update line still respond.")
+    addCheckbox(category, "routeChat", "Show a short route-update line",
+        "Prints one line when an automatic TomTom target/zone rebuild finishes.")
     addSlider(category, "ring", "Nearby-node circle distance", 0, 200, 5,
         "Nodes inside this distance become hollow circles so the game's tracking dot stays visible.", " yd")
 

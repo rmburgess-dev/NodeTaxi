@@ -25,7 +25,8 @@ local DEFAULTS = {
     ring = 100,       -- yards at which a node marker becomes a hollow ring (0 = off)
     log = true,       -- keep a persistent diagnostic log in NodeTaxiDB
     logChat = false,  -- print one line per gather/validation
-    quiet = true,     -- suppress automatic route/gather/crossing chat
+    quiet = true,     -- suppress per-node/gather/crossing chat
+    routeChat = true, -- keep one short line when an automatic route is built
     debug = false,
     welcome = false,
     allNodes = true,  -- draw every known node under the displayed map
@@ -59,6 +60,12 @@ NodeTaxi.Print = Print
 
 local function Notify(message)
     if not settings or not settings.quiet then
+        Print(message)
+    end
+end
+
+local function NotifyRoute(message)
+    if not settings or settings.routeChat ~= false then
         Print(message)
     end
 end
@@ -2568,7 +2575,15 @@ local function ScheduleBuild(delay)
 
     local function run()
         if token == buildToken then
-            NodeTaxi:BuildRoute(not (settings and settings.quiet))
+            local built = NodeTaxi:BuildRoute(false)
+            if built and state.route then
+                local route = state.route
+                NotifyRoute(string.format("route updated: %d node%s, %d zone%s.",
+                    route.totalNodes or 0,
+                    (route.totalNodes or 0) == 1 and "" or "s",
+                    #(route.legs or {}),
+                    #(route.legs or {}) == 1 and "" or "s"))
+            end
         end
     end
 
@@ -3584,6 +3599,7 @@ driver:RegisterEvent("MINIMAP_UPDATE_TRACKING")
 local elapsedSinceTick = 0
 local elapsedSincePosition = 0
 local elapsedSinceMinimap = 0
+local elapsedSinceTarget = 0
 driver:SetScript("OnUpdate", function(_, elapsed)
     if db then
         elapsedSincePosition = elapsedSincePosition + elapsed
@@ -3599,6 +3615,15 @@ driver:SetScript("OnUpdate", function(_, elapsed)
                     onTaxi = UnitOnTaxi and UnitOnTaxi("player") or false,
                 }
             end
+        end
+    end
+
+    elapsedSinceTarget = elapsedSinceTarget + elapsed
+    if elapsedSinceTarget >= 1 and db then
+        elapsedSinceTarget = 0
+        local uid = ReadArrowTarget()
+        if uid then
+            NodeTaxi:OnArrowTargetChanged(uid)
         end
     end
 

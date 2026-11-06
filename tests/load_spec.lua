@@ -172,7 +172,7 @@ _G.time = os.time
 _G.IsInInstance = function() return false end
 _G.hooksecurefunc = function() end
 _G.GetBuildInfo = function() return "1.60.1", "70790", "Nov 4 2026", 16001 end
-_G.GetAddOnMetadata = function() return "0.9.26" end
+_G.GetAddOnMetadata = function() return "0.9.27" end
 _G.GetSpellInfo = function(id)
     if id == 2366 then return "Herb Gathering" end
     if id == 2575 then return "Mining" end
@@ -332,10 +332,27 @@ runTimers()
 check("destination read from TomTom", ADDON.state.dest ~= nil)
 check("route built automatically", ADDON.state.route ~= nil)
 
+-- A second TomTom target update must rebuild without /nt route.
+currentUid = { 1429, 0.5, 0.8, title = "Second automatic target" }
+if tomtomCallbacks.ArrowTargetChanged then
+    tomtomCallbacks.ArrowTargetChanged("ArrowTargetChanged", currentUid)
+end
+runTimers()
+check("TomTom target change rebuilds automatically", ADDON.state.route ~= nil
+    and ADDON.state.route.dest and math.abs(ADDON.state.route.dest.y - 0.8) < 1e-9,
+    ADDON.state.route and ADDON.state.route.dest and ADDON.state.route.dest.y)
+local routeNotice = false
+for _, message in ipairs(messages) do
+    if message:find("route updated:", 1, true) then
+        routeNotice = true
+    end
+end
+check("automatic route still gives one short notice", routeNotice == true)
+
 if ADDON.state.route then
     local route = ADDON.state.route
     check("route has nodes", #route.nodes >= 1, #route.nodes)
-    check("route ends at the target", route.dest and math.abs(route.dest.y - 0.9) < 1e-9)
+    check("route ends at the target", route.dest and math.abs(route.dest.y - 0.8) < 1e-9)
     check("route length is sane", route.plan.length >= route.plan.direct)
 end
 

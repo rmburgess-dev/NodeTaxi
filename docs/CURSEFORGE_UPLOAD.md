@@ -70,3 +70,21 @@ The conservative distribution choice is **Off** until the ARR artwork is
 permissioned or replaced. If you later enable API distribution, confirm the
 artwork permission first and keep `LICENSE`, `LICENSE-GPL-3.0.txt` and
 `ATTRIBUTION.md` in the project/source distribution.
+
+### Can we just pick GPLv3?
+
+Not for the package as it stands.
+
+- The MIT source code is GPLv3-compatible, and `transitions.lua` /
+  `corridors.lua` are already GPLv3. A combined code/data distribution can be
+  GPLv3.
+- `Media/` is GatherMate2 artwork marked **All Rights Reserved**. A GPLv3
+  grant over the whole package would purport to grant rights you do not have.
+- The node data package terms should also be confirmed before relicensing the
+  combined work.
+
+If you replace the ARR artwork with original/licensed icons and confirm the
+node-data terms, then **GPLv3** becomes a clean choice. In that case, the
+distribution toggle can be **On**, because GPLv3 permits redistribution.
+Choosing GPLv3 while also trying to prohibit third-party distribution is
+contradictory in spirit; use Other/custom plus Off until the art is resolved.

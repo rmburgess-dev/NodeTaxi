@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.24 - 2026-11-05
+
+- Rebuilt the baked snapshot from the updated Wowhead-derived
+  `GatherMate2_Data/Forever` package. The base package contains the same
+  13,332 herb and 10,486 ore coordinates; the nine extra Tirisfal veins from
+  the player's saved NodeTaxi import are merged via `tools/extra_nodes.json`
+  for a total of 23,827 nodes.
+- Match GatherMate2's default node presentation: 12 px full-alpha world icons,
+  9 px full-alpha minimap icons, node-specific artwork.
+- Show every known node in the current zone on the minimap even with no active
+  route, including faded rim markers for nodes just outside the view.
+- Keep tracking filtering and `/nt allnodes` behavior.
+
 ## 0.9.23 - 2026-11-05
 
 - Add a per-cluster cap (`/nt cluster`, default 4) so one dense node group

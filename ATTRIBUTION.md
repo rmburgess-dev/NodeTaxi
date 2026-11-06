@@ -21,10 +21,12 @@ HereBeDragons, which ships inside TomTom.
 ## Node data
 
 `data.lua` is generated from the **Forever** tables of
-*GatherMate2 Data Wowhead classic* `v2026-10-17`:
+*GatherMate2 Data Wowhead classic* `v2026-11-05`:
 
 - package by Marrtin, based on Spinx's classic data
 - coordinate collection originally by Wowhead users
+- nine extra Tirisfal nodes from the player's saved NodeTaxi scan, merged via
+  `tools/extra_nodes.json`
 - GatherMate2 itself by kagaro, Xinhuan, Nevcairiel and contributors
 - generator: `tools/build_seed.py`, source layout documented by GatherMate2_Data
 

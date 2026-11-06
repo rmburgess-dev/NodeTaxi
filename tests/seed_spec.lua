@@ -51,7 +51,7 @@ local mineZones, mineNodes = count(seed.mines)
 check("herb zone count", herbZones == 44, herbZones)
 check("herb node count", herbNodes == 13332, herbNodes)
 check("mine zone count", mineZones == 40, mineZones)
-check("mine node count", mineNodes == 10486, mineNodes)
+check("mine node count", mineNodes == 10495, mineNodes)
 
 validate(seed.herbs, "herbs")
 validate(seed.mines, "mines")
@@ -60,6 +60,12 @@ validate(seed.mines, "mines")
 check("Zephras Isle (2521) herbs", #(seed.herbs[2521].keys or {}) == 491, #(seed.herbs[2521].keys or {}))
 check("Zephras Isle (2521) mines", #(seed.mines[2521].keys or {}) == 241, #(seed.mines[2521].keys or {}))
 check("Riverglades (2548) herbs", #(seed.herbs[2548].keys or {}) == 100, #(seed.herbs[2548].keys or {}))
+
+-- The updated Wowhead-derived package had no new coordinates; these nine
+-- veins came from the player's saved NodeTaxi import.
+local tirisfalMineKeys = {}
+for _, key in ipairs(seed.mines[1420].keys or {}) do tirisfalMineKeys[key] = true end
+check("merged saved Tirisfal vein", tirisfalMineKeys[4521700200] == true)
 
 -- Specific node art is bundled and referenced by node id.
 check("copper icon mapped", type(seed.icons[201]) == "string" and seed.icons[201]:find("Mine", 1, true) ~= nil)

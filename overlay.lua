@@ -426,7 +426,7 @@ function NodeTaxi:RedrawWorld()
                     local nx, ny = ToScreen(zone.map, node.x, node.y)
                     if nx then
                         drawn[key] = true
-                        DrawWorldIcon(worldMarkers, frame, nx, ny, 7, NodeIcon(node), 0.32)
+                        DrawWorldIcon(worldMarkers, frame, nx, ny, 12, NodeIcon(node), 1)
                     end
                 end
             end
@@ -513,7 +513,7 @@ function NodeTaxi:RedrawWorld()
             for _, node in ipairs(leg.nodes or {}) do
                 local nx, ny = ToScreen(leg.map, node.x, node.y)
                 if nx then
-                    DrawWorldIcon(worldMarkers, frame, nx, ny, 10, NodeIcon(node), 0.85)
+                    DrawWorldIcon(worldMarkers, frame, nx, ny, 12, NodeIcon(node), 1)
                 end
             end
         end
@@ -555,7 +555,7 @@ function NodeTaxi:RedrawWorld()
                 DrawWorldRing(worldLines, frame, point.x, point.y, isNext and 11 or 8, color, isNext and 2 or 1.5)
             else
                 DrawWorldIcon(worldMarkers, frame, point.x, point.y,
-                    isNext and 15 or 11, NodeIcon(point.node), isNext and pulse or 1)
+                    isNext and 15 or 12, NodeIcon(point.node), isNext and pulse or 1)
             end
         end
     end
@@ -591,8 +591,7 @@ function NodeTaxi:RedrawMinimap()
     HidePool(minimapLines)
     HidePool(minimapMarkers)
 
-    local route = self.state.route
-    if not route or not Minimap or not Minimap:IsShown() then
+    if not Minimap or not Minimap:IsShown() then
         return
     end
     if IsInInstance and IsInInstance() then
@@ -605,7 +604,7 @@ function NodeTaxi:RedrawMinimap()
     end
 
     local playerMap = self:GetPlayerZone()
-    if not playerMap or playerMap ~= route.map then
+    if not playerMap then
         return
     end
 
@@ -626,6 +625,7 @@ function NodeTaxi:RedrawMinimap()
     if halfWidth <= 0 then
         return
     end
+    local maxRadius = min(halfWidth, halfHeight) * 1.02
 
     local rotate = GetCVar("rotateMinimap") == "1"
     local sinFacing, cosFacing
@@ -644,12 +644,64 @@ function NodeTaxi:RedrawMinimap()
         return (dx / radius) * halfWidth, -(dy / radius) * halfHeight
     end
 
+    local function Inside(x, y)
+        return (x * x + y * y) <= maxRadius * maxRadius
+    end
+
+    local route = self.state.route
+    if route and route.map ~= playerMap then
+        route = nil
+    end
+
+    local selected = {}
+    if route then
+        for _, node in ipairs(route.nodes or {}) do
+            selected[string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))] = true
+        end
+    end
+
+    -- GatherMate2-style minimap field: every known node in the current zone.
+    -- Out-of-range nodes are pulled to the rim and faded, matching
+    -- GatherMate2's default nodeRange behavior.
+    if self.settings and self.settings.allNodes then
+        for _, node in ipairs(self:NodeListForMap(playerMap)) do
+            local key = string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))
+            if not selected[key] then
+                local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone,
+                    hbd, node.x, node.y, playerMap)
+                if worldOk and wx and instance == playerInstance then
+                    local u, v = ToMinimap(wx, wy)
+                    local screenDistance = sqrt(u * u + v * v)
+                    local alpha = 1
+                    if screenDistance > maxRadius then
+                        local ratio = screenDistance / maxRadius
+                        if ratio > 2 then
+                            alpha = 0
+                        else
+                            alpha = 2 - ratio
+                            u = u * (maxRadius / screenDistance)
+                            v = v * (maxRadius / screenDistance)
+                        end
+                    end
+                    if alpha > 0 then
+                        DrawMinimapIcon(minimapMarkers, frame, u, v, 9, NodeIcon(node), alpha)
+                    end
+                end
+            end
+        end
+    end
+
+    if not route then
+        return
+    end
+
     local points = { { x = 0, y = 0, live = true } }
 
     for i = route.index or 1, #route.nodes do
         local node = route.nodes[i]
         if (node.map or route.map) == route.map then
-            local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone, hbd, node.x, node.y, node.map or route.map)
+            local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone,
+                hbd, node.x, node.y, node.map or route.map)
             if worldOk and wx and instance == playerInstance then
                 local u, v = ToMinimap(wx, wy)
                 local dx, dy = playerX - wx, playerY - wy
@@ -665,20 +717,20 @@ function NodeTaxi:RedrawMinimap()
     end
 
     if route.dest and route.dest.map == route.map then
-        local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone, hbd, route.dest.x, route.dest.y, route.dest.map)
+        local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone,
+            hbd, route.dest.x, route.dest.y, route.dest.map)
         if worldOk and wx and instance == playerInstance then
             local u, v = ToMinimap(wx, wy)
             points[#points + 1] = { x = u, y = v, dest = true }
         end
     end
 
-    -- Path points are separate from the node markers: the visible line is
-    -- the core's node-to-node path along the hidden corridor reference.
     local pathPoints = {}
     local currentLeg = route.legs and route.legs[1]
     if currentLeg and currentLeg.routePoints then
         for _, routePoint in ipairs(currentLeg.routePoints) do
-            local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone, hbd, routePoint.x, routePoint.y, currentLeg.map)
+            local worldOk, wx, wy, instance = pcall(hbd.GetWorldCoordinatesFromZone,
+                hbd, routePoint.x, routePoint.y, currentLeg.map)
             if worldOk and wx and instance == playerInstance then
                 local u, v = ToMinimap(wx, wy)
                 pathPoints[#pathPoints + 1] = { x = u, y = v }
@@ -691,12 +743,7 @@ function NodeTaxi:RedrawMinimap()
     local lineSet = minimapLines
     local parent = frame
     local mask = GetMinimapMask()
-    local maxRadius = min(halfWidth, halfHeight) * 1.02
     local pathColor = route.preview and COLORS.preview or COLORS.path
-
-    local function Inside(x, y)
-        return (x * x + y * y) <= maxRadius * maxRadius
-    end
 
     local function DrawMinimapDashes(x1, y1, x2, y2, color)
         local dx, dy = x2 - x1, y2 - y1
@@ -745,7 +792,8 @@ function NodeTaxi:RedrawMinimap()
             end
 
             if ringDistance > 0 and point.distance and point.distance <= ringDistance then
-                DrawMinimapRing(minimapLines, parent, point.x, point.y, isNext and 9 or 7, color, isNext and 2 or 1.5, mask)
+                DrawMinimapRing(minimapLines, parent, point.x, point.y,
+                    isNext and 9 or 7, color, isNext and 2 or 1.5, mask)
             else
                 DrawMinimapIcon(minimapMarkers, parent, point.x, point.y,
                     isNext and 13 or 9, NodeIcon(point.node), isNext and pulse or 1)
@@ -754,7 +802,6 @@ function NodeTaxi:RedrawMinimap()
     end
 end
 
---[[ Diagnostics -----------------------------------------------------------]]
 function NodeTaxi:OverlayDebugInfo()
     return {
         world = worldFrame and ("ready via " .. tostring(self.worldOverlaySource)) or "not created",

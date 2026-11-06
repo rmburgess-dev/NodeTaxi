@@ -8,7 +8,7 @@ waypoints — your arrow and destination stay exactly where they were.
 
 ## Features
 
-- **23,818 baked Forever nodes** across 44 zones, including Zephras Isle and
+- **23,827 baked Forever nodes** across 44 zones, including Zephras Isle and
   Riverglades.
 - **Follows your tracking.** With Find Minerals up you see only ore nodes; with
   Find Herbs, only herbs. Switching tracking rebuilds the route automatically.
@@ -84,7 +84,7 @@ route appears on the world map and minimap.
 
 ## Data notes
 
-The baked snapshot is from **GatherMate2 Data Wowhead classic v2026-10-17**
+The baked snapshot is from **GatherMate2 Data Wowhead classic v2026-11-05**
 (Forever tables), a Wowhead-derived package. Old-world zones are dense and
 roughly 92% overlap with the mature Classic Era table; Zephras Isle and
 Riverglades are included. Mount Hyjal and Shen'dralas have no baked nodes yet.

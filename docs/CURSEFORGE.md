@@ -24,6 +24,8 @@ It is designed for players who want to keep moving toward a destination while pi
 - **Short resource side-trips.** When the route reaches a nearby node, it chains other nodes within 100 yards, then merges back to the travel corridor. Up to 4 nodes are selected from one cluster and 8 per leg by default; both are configurable.
 - **Forward-moving route shape.** The visible line is smoothed and follows the corridor. It does not paint a separate corridor spine or blue transition bars.
 - **Stable while moving.** A full leg keeps its selected nodes instead of reshuffling as you walk. When a pickup frees a slot, the rolling re-plan can add a newly nearby node.
+- **In-game settings page.** Configure routing, display, tracking and quiet chat at **Settings → AddOns → NodeTaxi**, or open it with `/nt options`.
+- **Quiet by default.** Automatic node-reached, crossing, gather and route-summary messages are suppressed. The route updates when the TomTom target changes; enable optional rolling updates with `/nt replan 30`.
 - **Learns from you.** Successful Herb Gathering and Mining casts are remembered. `/nt import gathermate2` imports local GatherMate2 data, and `/nt here` records a manual node.
 
 ### How the route is built
@@ -40,7 +42,8 @@ The default limits are:
 - 100-yard node deviation from the corridor
 - 4 nodes per nearby cluster
 - 8 selected nodes per leg
-- 30-yard rolling re-plan distance
+- Rolling re-plan off by default (updates when the TomTom target changes)
+- Automatic chat quiet by default
 - 100-yard ring distance
 
 All of these are adjustable in game.
@@ -103,6 +106,8 @@ Useful first commands:
 
 ### Configuration
 
+Most options are available in **Settings → AddOns → NodeTaxi** (`/nt options`). Slash commands remain available for quick changes.
+
 | Command | Effect |
 | --- | --- |
 | `/nt route` | Build or rebuild the route to TomTom's active target |
@@ -114,7 +119,9 @@ Useful first commands:
 | `/nt cluster 4` | Maximum nodes from one nearby cluster |
 | `/nt spur 100` | Maximum node deviation from the route |
 | `/nt width 300` | Corridor search half-width |
-| `/nt replan 30` | Movement before the current leg is re-evaluated |
+| `/nt replan 0` | Rolling update distance (0 = only new TomTom target; default) |
+| `/nt quiet on\|off` | Suppress automatic route/gather/crossing chat |
+| `/nt options` | Open the in-game settings page |
 | `/nt ring 100` | Distance where icons become hollow circles |
 | `/nt detour 1.8` | Route-length budget relative to direct distance |
 | `/nt here [herb\|ore]` | Record a node at your position |
@@ -170,7 +177,7 @@ TomTom (Cladhaire, Ludovicus), HereBeDragons (Nevcairiel), GatherMate2 and Gathe
 
 **License:** NodeTaxi code is MIT. Baked data and artwork retain their third-party terms; see `LICENSE`, `LICENSE-GPL-3.0.txt` and `ATTRIBUTION.md` in the repository.
 
-**Current release:** 0.9.26.
+**Current release:** 0.9.27.
 
 ## Deutsch
 
@@ -186,6 +193,8 @@ Wichtigste Funktionen:
 - Knoten innerhalb von 100 Yards werden zu hohlen Kreisen, damit der eigene Tracking-Punkt sichtbar bleibt.
 - Echte Zonenübergänge über 63 Carbonite-Paare; ausgewählte Knoten in jeder Zone.
 - Kurze Nebenwege mit maximal 4 Knoten pro Cluster und 8 pro Etappe.
+
+Die meisten Optionen stehen unter **Einstellungen → AddOns → NodeTaxi** oder über `/nt options` bereit. Standardmäßig ist der automatische Chat ruhig; die Route aktualisiert sich bei einem neuen TomTom-Ziel, nicht bei jeder Bewegung.
 
 Voraussetzungen: **TomTom**, **WoW Forever 1.60.1 / Interface 16001**. Installation nach `_forever_/Interface/AddOns/NodeTaxi`, danach `/reload` und `/nt`.
 
@@ -208,6 +217,8 @@ Points principaux :
 - Vrais passages entre zones via 63 paires Carbonite ; sélection de nœuds dans chaque zone.
 - Détours courts : 4 nœuds maximum par groupe, 8 par étape.
 
+La plupart des options sont dans **Options → AddOns → NodeTaxi** ou via `/nt options`. Le chat automatique est silencieux par défaut ; la route se met à jour lors d’une nouvelle cible TomTom, pas à chaque déplacement.
+
 Prérequis : **TomTom**, **WoW Forever 1.60.1 / Interface 16001**. Installez dans `_forever_/Interface/AddOns/NodeTaxi`, puis `/reload` et `/nt`.
 
 Limites : pas d'autopilote, pas d’évitement complet du terrain, lignes de secours pour les transports et zones sans corridor, instantané de données potentiellement ancien. Aucun accès réseau ; les données restent locales.
@@ -228,6 +239,8 @@ Características principales:
 - Los nodos a menos de 100 yardas se convierten en círculos huecos para dejar visible el punto de rastreo del juego.
 - Transiciones reales entre zonas mediante 63 pares de Carbonite; nodos seleccionados en cada zona.
 - Desvíos cortos: máximo 4 nodos por grupo y 8 por tramo.
+
+La mayoría de las opciones están en **Opciones → AddOns → NodeTaxi** o con `/nt options`. El chat automático está silenciado por defecto; la ruta se actualiza al cambiar el objetivo de TomTom, no con cada movimiento.
 
 Requisitos: **TomTom**, **WoW Forever 1.60.1 / Interface 16001**. Instala en `_forever_/Interface/AddOns/NodeTaxi`, luego `/reload` y `/nt`.
 

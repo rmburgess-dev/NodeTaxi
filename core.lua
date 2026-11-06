@@ -21,12 +21,13 @@ local DEFAULTS = {
     arrive = 18,      -- yards at which a node counts as collected
     auto = true,      -- rebuild when the TomTom arrow target changes
     kind = "auto",    -- "auto" follows the active tracking, else herb/ore/both
-    replan = 30,      -- yards moved before the remaining route is re-ordered (0 = off)
+    replan = 0,       -- 0 = only rebuild on a new TomTom target (default)
     ring = 100,       -- yards at which a node marker becomes a hollow ring (0 = off)
     log = true,       -- keep a persistent diagnostic log in NodeTaxiDB
-    logChat = true,   -- also print one line per gather/validation
+    logChat = false,  -- print one line per gather/validation
+    quiet = true,     -- suppress automatic route/gather/crossing chat
     debug = false,
-    welcome = true,
+    welcome = false,
     allNodes = true,  -- draw every known node under the displayed map
     spur = 100,      -- max yards a selected node may pull away from the reference
     cluster = 4,     -- max nodes selected from one nearby cluster
@@ -55,6 +56,12 @@ local function Print(message)
     end
 end
 NodeTaxi.Print = Print
+
+local function Notify(message)
+    if not settings or not settings.quiet then
+        Print(message)
+    end
+end
 
 local function MapName(mapID)
     local info = mapID and C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(mapID)
@@ -284,7 +291,7 @@ local function InitDB()
     NodeTaxiDB = NodeTaxiDB or {}
     db = NodeTaxiDB
     local oldVersion = db.version or 1
-    db.version = 4
+    db.version = 5
 
     db.settings = db.settings or {}
     for key, value in pairs(DEFAULTS) do
@@ -303,6 +310,17 @@ local function InitDB()
     -- around 80-100 yards, so use the full 100-yard band by default.
     if oldVersion < 4 and db.settings.spur == 75 then
         db.settings.spur = 100
+    end
+
+    -- 0.9.27 defaults: quiet automatic chat and no rolling reshuffle unless
+    -- the player explicitly enables it.
+    if oldVersion < 5 then
+        if db.settings.replan == 30 then
+            db.settings.replan = 0
+        end
+        if db.settings.logChat == true then
+            db.settings.logChat = false
+        end
     end
 
     db.nodes = db.nodes or {}
@@ -1334,7 +1352,7 @@ function NodeTaxi:RecordZoneTransition()
     })
 
     if edge.count == 1 then
-        Print(string.format("learned a real crossing: %s -> %s at %s.",
+        Notify(string.format("learned a real crossing: %s -> %s at %s.",
             MapName(previous.map) or previous.map,
             MapName(map) or map,
             CoordText(previous.x, previous.y)))
@@ -2538,7 +2556,7 @@ function NodeTaxi:ReplanFromCurrent(announce)
     self:Redraw()
 
     if announce then
-        Print(string.format("route re-ordered: %d node(s), %.0f yd to go.", #plan.nodes, plan.length))
+        Notify(string.format("route re-ordered: %d node(s), %.0f yd to go.", #plan.nodes, plan.length))
     end
 
     return true
@@ -2550,7 +2568,7 @@ local function ScheduleBuild(delay)
 
     local function run()
         if token == buildToken then
-            NodeTaxi:BuildRoute(true)
+            NodeTaxi:BuildRoute(not (settings and settings.quiet))
         end
     end
 
@@ -2582,9 +2600,9 @@ function NodeTaxi:OnArrowTargetChanged(uid)
         ScheduleBuild(0.4)
     elseif state.route then
         self:ClearRoute(nil, true)
-        Print("TomTom target changed. /nt route to draw the new route.")
+        Notify("TomTom target changed. /nt route to draw the new route.")
     else
-        Print(string.format("TomTom target: %s in %s. /nt route to draw.",
+        Notify(string.format("TomTom target: %s in %s. /nt route to draw.",
             CoordText(dest.x, dest.y), MapName(dest.map) or ("map " .. dest.map)))
     end
 end
@@ -2763,10 +2781,10 @@ function NodeTaxi:Tick()
     if DistanceSquared(node) <= arrive * arrive then
         route.index = route.index + 1
         if route.index > #route.nodes then
-            Print("route complete - all nodes on the path were collected.")
+            Notify("route complete - all nodes on the path were collected.")
             self:ClearRoute(nil, true)
         else
-            Print(string.format("node %d/%d reached.", route.index - 1, #route.nodes))
+            Notify(string.format("node %d/%d reached.", route.index - 1, #route.nodes))
             if (settings.replan or 0) > 0 and self:ReplanFromCurrent(false) then
                 return
             end
@@ -2924,7 +2942,7 @@ local function OnSpellcastSucceeded(unit, castGUID, spellID)
         h = zoneHeight,
     })
 
-    if settings.logChat then
+    if settings.logChat and not settings.quiet then
         local seedText
         if seedDistance then
             seedText = string.format("nearest baked %.0f yd", seedDistance)
@@ -2942,6 +2960,8 @@ local function PrintHelp()
     Print("  /nt route          build a route to the current TomTom arrow target")
     Print("  /nt stop           clear the drawn route")
     Print("  /nt dest           show the TomTom arrow target")
+    Print("  /nt options        open Settings -> AddOns -> NodeTaxi")
+    Print("  /nt quiet on|off   suppress automatic route/gather chat")
     Print("  /nt here [herb|ore] remember a node where you stand")
     Print("  /nt nodes          node counts")
     Print("  /nt crossings      real zone crossings known from this zone")
@@ -3146,6 +3166,66 @@ local function OnOff(value)
     return nil
 end
 
+--[[ Settings page API -----------------------------------------------------]]
+local settingsToken = 0
+
+function NodeTaxi:GetSettings()
+    InitSettingsIfNeeded()
+    return settings
+end
+
+function NodeTaxi:GetDefaults()
+    return DEFAULTS
+end
+
+function NodeTaxi:SetSetting(key, value)
+    InitSettingsIfNeeded()
+    settings[key] = value
+    self:ApplySettings()
+end
+
+function NodeTaxi:ApplySettings()
+    InitSettingsIfNeeded()
+    self.worldNodeCache = nil
+    self.nodeListCache = nil
+    settingsToken = settingsToken + 1
+    local token = settingsToken
+
+    local function apply()
+        if token ~= settingsToken then
+            return
+        end
+        if state.route and not state.route.preview then
+            self:BuildRoute(false)
+        elseif self.Redraw then
+            self:Redraw()
+        end
+    end
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0.2, apply)
+    else
+        apply()
+    end
+end
+
+function NodeTaxi:ResetSettings()
+    InitSettingsIfNeeded()
+    for key, value in pairs(DEFAULTS) do
+        settings[key] = value
+    end
+    self:ApplySettings()
+    Print("settings reset to defaults.")
+end
+
+function NodeTaxi:OpenSettings()
+    if not (self.settingsCategory and Settings and Settings.OpenToCategory) then
+        Print("the settings panel is not available on this client.")
+        return
+    end
+    Settings.OpenToCategory(self.settingsCategory:GetID())
+end
+
 local function HandleCommand(message)
     InitSettingsIfNeeded()
 
@@ -3169,6 +3249,9 @@ local function HandleCommand(message)
 
     elseif command == "dest" then
         NodeTaxi:PrintDestination()
+
+    elseif command == "options" or command == "config" then
+        NodeTaxi:OpenSettings()
 
     elseif command == "here" then
         local kind = rest:lower()
@@ -3235,6 +3318,10 @@ local function HandleCommand(message)
 
     elseif command == "validate" then
         NodeTaxi:ValidateHere()
+
+    elseif command == "quiet" then
+        settings.quiet = rest:lower() ~= "off"
+        Print("automatic chat " .. (settings.quiet and "quiet" or "verbose") .. ".")
 
     elseif command == "log" then
         local argument = rest:lower()
@@ -3537,6 +3624,9 @@ end)
 local function OnEvent(_, event, ...)
     if event == "PLAYER_LOGIN" then
         InitDB()
+        if NodeTaxi.BuildOptions then
+            NodeTaxi:BuildOptions()
+        end
 
         local version = AddonVersion()
         local _, build = GetBuildInfo()
@@ -3562,12 +3652,12 @@ local function OnEvent(_, event, ...)
 
         RegisterTomTom()
 
-        if settings.welcome then
+        if settings.welcome and not settings.quiet then
             Print(string.format("loaded. %d node(s) known. /nt for commands.", NodeTaxi:NodeCount(nil)))
         end
 
         if NodeTaxi:NodeCount(nil) < 50 and #GetGatherMateSources() > 0 then
-            Print("GatherMate2 data detected. /nt import gathermate2 to seed the routes.")
+            Notify("GatherMate2 data detected. /nt import gathermate2 to seed the routes.")
         end
 
     elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then

@@ -22,12 +22,12 @@ reads the active target once at login) to learn *where* you are going.
    minimap tracking (Find Herbs or Find Minerals) and only routes to that
    resource type.
 2. Takes the current TomTom arrow target as the destination.
-3. Keeps the known nodes that lie inside a corridor around the straight line
-   between you and that destination.
-4. Orders them with nearest-neighbour + 2-opt, within a node budget and a
-   detour budget.
-5. Re-evaluates the remaining route as you move (every 30 yards by default),
-   so the order follows your actual position instead of the original start.
+3. Uses a hidden entrance-to-exit corridor through each zone and collects
+   nearby node clusters within the corridor deviation and cluster limits.
+4. Orders each cluster with an exact entry-to-merge path, within the node,
+   cluster and detour budgets.
+5. By default, updates only when the TomTom target changes or you enter a new
+   zone. Optional rolling re-planning is available with `/nt replan 30`.
    Targets in another zone get a **real-crossing leg**: NodeTaxi uses paired
    zone-connection coordinates baked from Carbonite's Classic dataset, plus
    crossings learned from your actual zone changes and the client's map-link
@@ -55,6 +55,24 @@ World of Warcraft/_forever_/Interface/AddOns/NodeTaxi/core.lua
 
 TomTom is a hard dependency. Restart the client once after adding the folder;
 `/reload` is enough for later updates.
+
+## Settings
+
+Most options are available in the game at **Settings → AddOns → NodeTaxi**.
+Open it from chat with:
+
+```
+/nt options
+```
+
+The page includes routing limits, tracking filter, all-node display, ring
+distance, automatic-update behavior, quiet chat, and action buttons for route
+build/clear, preview, GatherMate2 import and reset.
+
+Defaults are quiet: automatic node-reached, crossing, gather and route-summary
+messages are suppressed. Manual `/nt` commands still respond. The route updates
+when the TomTom target changes; set `/nt replan 30` for optional rolling updates
+while moving.
 
 ## Quick test (no farming required)
 
@@ -97,9 +115,11 @@ Then, with a real TomTom waypoint set:
 | `/nt spur 100` | maximum yard deviation for a selected node |
 | `/nt detour 1.8` | route length budget as a multiple of direct distance |
 | `/nt arrive 18` | yards at which a node counts as collected |
-| `/nt replan 30` | yards moved before the remaining route is re-planned (0 = off) |
+| `/nt replan 0` | rolling update distance (0 = only new TomTom target; default) |
 | `/nt ring 100` | yards at which a node marker becomes a hollow ring (0 = off) |
 | `/nt auto on\|off` | rebuild automatically when the TomTom target changes |
+| `/nt quiet on\|off` | suppress automatic route/gather/crossing chat (default on) |
+| `/nt options` | open Settings → AddOns → NodeTaxi |
 | `/nt kind auto\|herb\|ore\|both` | node filter; `auto` follows active tracking (default) |
 | `/nt learn herb\|ore <spellID>` | teach a gather spell the addon does not know |
 | `/nt watch` | log successful casts, to verify node learning |
@@ -116,12 +136,12 @@ baked snapshot lives in `data.lua` and is never written to saved variables.
 * **Budget**: `max(length / max(direct, 200 yd), ...) <= detour`; nodes are
   removed one at a time (the one that saves the most length) until the route
   fits both the node budget and the detour budget.
-* **Order**: greedy nearest neighbour, then 2-opt with the player and the
-  target pinned at the ends.
-* **Re-planning**: after every `replan` yards of movement (and after each node
-  is collected or skipped), the remaining nodes are re-ordered from the current
-  position; collected nodes are never fed back in. The 2-second guard keeps a
-  fast mount or flight path from rebuilding every tick.
+* **Order**: the current leg's branch clusters are ordered exactly from their
+  corridor entry to their forward merge point; large clusters use a bounded
+  2-opt fallback.
+* **Updates**: by default the route is built when the TomTom target changes or
+  you enter the next zone. Set `/nt replan 30` if you want optional rolling
+  re-planning after movement; collected nodes are never fed back in.
 * **Markers**: node-specific resource icons at distance - Copper Vein uses the
   copper ore art, Peacebloom the peacebloom art, and so on. The pristine
   artwork comes from GatherMate2's `Artwork/` folder and is bundled under

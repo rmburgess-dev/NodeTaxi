@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.27 - 2026-11-05
+
+- Add a native **Settings → AddOns → NodeTaxi** page with routing, display,
+  tracking, quiet-chat and action controls. `/nt options` opens it.
+- Default automatic chat to quiet: no node-reached, crossing, gather or
+  automatic route-summary messages. Manual `/nt` commands still respond.
+- Default rolling re-plan to off. The route updates when the TomTom target
+  changes or you enter a new zone; `/nt replan 30` enables rolling updates.
+- Migrate existing 30-yard re-plan and chat-logging settings to the new quiet
+  defaults while preserving explicit non-default values.
+- Add `/nt quiet on|off` and `/nt options`.
+
 ## 0.9.26 - 2026-11-05
 
 - Raise minimap redraw from every 0.35 s (~3 FPS) to every 0.05 s (~20 FPS).

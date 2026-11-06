@@ -172,6 +172,7 @@ _G.time = os.time
 _G.IsInInstance = function() return false end
 _G.hooksecurefunc = function() end
 _G.GetBuildInfo = function() return "1.60.1", "70790", "Nov 4 2026", 16001 end
+_G.GetAddOnMetadata = function() return "0.9.26" end
 _G.GetSpellInfo = function(id)
     if id == 2366 then return "Herb Gathering" end
     if id == 2575 then return "Mining" end
@@ -209,11 +210,46 @@ local function loadAddonFile(path)
     chunk("NodeTaxi", ADDON)
 end
 
+local settingsInitializers = 0
+local settingsCategory = nil
+local function proxySetting(name, varType, default)
+    return {
+        GetName = function() return name end,
+        GetVariableType = function() return varType end,
+        GetDefaultValue = function() return default end,
+        GetValue = function() return default end,
+        SetValue = function() end,
+    }
+end
+_G.Settings = {
+    VarType = { Boolean = "Boolean", Number = "Number", String = "String" },
+    RegisterVerticalLayoutCategory = function(name)
+        return { name = name, GetID = function() return 9001 end }
+    end,
+    RegisterProxySetting = function(_, variable, varType, name, default)
+        return proxySetting(name, varType, default)
+    end,
+    RegisterInitializer = function() settingsInitializers = settingsInitializers + 1 end,
+    CreateCheckboxInitializer = function() return {} end,
+    CreateSliderInitializer = function() return {} end,
+    CreateDropdownInitializer = function() return {} end,
+    CreateSliderOptions = function() return { SetLabelFormatter = function() end } end,
+    CreateControlTextContainer = function()
+        return { Add = function() end, GetData = function() return {} end }
+    end,
+    RegisterAddOnCategory = function(category) settingsCategory = category end,
+    OpenToCategory = function() end,
+}
+_G.CreateSettingsListSectionHeaderInitializer = function(text) return { text = text } end
+_G.CreateSettingsButtonInitializer = function() return {} end
+_G.MinimalSliderWithSteppersMixin = { Label = { Right = 1 } }
+
 loadAddonFile("transitions.lua")
 loadAddonFile("corridors.lua")
 loadAddonFile("route.lua")
 loadAddonFile("core.lua")
 loadAddonFile("overlay.lua")
+loadAddonFile("options.lua")
 
 assert(ADDON.Route, "route module missing")
 assert(ADDON.BuildRoute, "core did not load")
@@ -255,6 +291,16 @@ end
 fire("PLAYER_LOGIN")
 check("login created DB", _G.NodeTaxiDB ~= nil)
 check("login registered TomTom callback", tomtomCallbacks.ArrowTargetChanged ~= nil)
+check("settings page registered", settingsCategory ~= nil)
+check("settings controls registered", settingsInitializers > 0, settingsInitializers)
+check("quiet defaults on", ADDON.settings.quiet == true)
+check("automatic gather chat defaults off", ADDON.settings.logChat == false)
+check("rolling replan defaults off", ADDON.settings.replan == 0)
+ADDON.HandleCommand("options")
+ADDON.HandleCommand("quiet off")
+check("quiet can be disabled", ADDON.settings.quiet == false)
+ADDON.HandleCommand("quiet on")
+check("quiet can be restored", ADDON.settings.quiet == true)
 
 -- A node is learned from a real gather cast.
 fire("UNIT_SPELLCAST_SUCCEEDED", "player", "guid", 2366)

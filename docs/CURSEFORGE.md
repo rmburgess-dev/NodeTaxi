@@ -2,103 +2,235 @@
 
 **Tracking-aware gathering routes for WoW Forever — follow your TomTom path, with short detours through nearby herbs and ore.**
 
-NodeTaxi draws a dashed yellow route from you toward your current **TomTom** waypoint. It follows a hidden zone-to-zone walking corridor, makes brief side-trips to nearby resource nodes, then rejoins the path. It never moves your TomTom arrow, changes your destination, or edits your TomTom waypoints.
+## English
 
-## Highlights
+### Overview
 
-- **Follows your active tracking.** Find Minerals shows ore routes; Find Herbs shows herb routes. Switching tracking rebuilds the route. Override with `/nt kind auto|herb|ore|both`.
-- **23,827 baked herb/ore nodes** across 44 Forever zones, including Zephras Isle and Riverglades. Every node is shown, explored or not, even with no route active.
-- **GatherMate2-style node display.** Node-specific artwork at 12 px on the world map and 9 px on the minimap, full alpha, matching GatherMate2's default presentation.
-- **All nearby nodes become rings.** Inside `/nt ring` (100 yd by default) every node switches from an icon to a hollow circle, so the game's own tracking dot stays visible in the middle.
-- **Minimap field.** Every known node in the current zone is drawn on the minimap, including faded rim markers for nodes just outside the view. Updates at 20 FPS.
-- **Cross-zone routing at real transitions.** Uses 63 paired Carbonite transition coordinates — land borders, portals, boats, zeppelins and the tram — not guessed map edges. Nodes are selected in every zone along the route.
-- **Short resource side-trips.** After reaching a node, NodeTaxi chains nearby nodes within 100 yd, then merges back to the corridor. Up to 4 nodes per cluster and 8 per leg by default; both limits are configurable.
-- **Curved, forward-moving line.** The corridor itself is hidden; the visible line is smoothed and never paints a separate spine or blue transition bars.
+NodeTaxi is a companion for **TomTom** that turns your current arrow target into a gathering-friendly journey. Instead of only showing the next waypoint, it draws a dashed yellow route from your position toward that target, follows a hidden zone-to-zone travel corridor, and makes short side-trips to nearby resource nodes before rejoining the path.
+
+It is designed for players who want to keep moving toward a destination while picking up herbs and ore along the way. NodeTaxi never moves the TomTom arrow, replaces the destination, or changes your TomTom waypoints.
+
+### Main features
+
+- **TomTom-native, read-only routing.** Your arrow and destination stay exactly where TomTom put them. NodeTaxi only reads the active arrow target.
+- **Follows your gathering tracking.** With Find Minerals active, the route targets ore. With Find Herbs, it targets herbs. Switching tracking rebuilds the route. You can override this with `/nt kind auto|herb|ore|both`.
+- **23,827 baked herb and ore nodes** across 44 WoW Forever zones, including Zephras Isle and Riverglades.
+- **Every known node is shown.** The world map and minimap draw the full known-node field, whether the zone is explored or not, and even with no active route.
+- **GatherMate2-style presentation.** Node-specific artwork at 12 px on the world map and 9 px on the minimap, full alpha, using the same GatherMate2 artwork that players already know.
+- **Hollow rings up close.** Inside `/nt ring` — 100 yards by default — every nearby node changes from an icon to a hollow circle, keeping the game's own tracking dot visible in the middle. This applies to the whole node field, not only the selected route.
+- **Full minimap field.** All known nodes in the current zone appear on the minimap, including faded rim markers for nodes just outside the view. The overlay refreshes at 20 FPS.
+- **Real cross-zone travel.** NodeTaxi uses 63 paired Carbonite transition coordinates for land borders, portals, boats, zeppelins and the tram, rather than guessing at geometric map edges.
+- **Multi-zone node selection.** Every zone along the route can contribute nodes, not just your current zone. The current leg is bright; later legs are paler.
+- **Short resource side-trips.** When the route reaches a nearby node, it chains other nodes within 100 yards, then merges back to the travel corridor. Up to 4 nodes are selected from one cluster and 8 per leg by default; both are configurable.
+- **Forward-moving route shape.** The visible line is smoothed and follows the corridor. It does not paint a separate corridor spine or blue transition bars.
+- **Stable while moving.** A full leg keeps its selected nodes instead of reshuffling as you walk. When a pickup frees a slot, the rolling re-plan can add a newly nearby node.
 - **Learns from you.** Successful Herb Gathering and Mining casts are remembered. `/nt import gathermate2` imports local GatherMate2 data, and `/nt here` records a manual node.
-- **Read-only toward TomTom.** No waypoint changes, no arrow hijack, no destination replacement.
 
-## Requirements
+### How the route is built
 
-- **TomTom** — required
-- **WoW Forever 1.60.1**, Interface **16001**
-- HereBeDragons is included with TomTom; no separate install
+NodeTaxi separates the journey into two layers:
 
-## Install
+1. **A hidden travel corridor** between the real zone entrance and exit points.
+2. **Local resource branches** that leave the corridor, visit a compact group of nodes, and merge back at a forward point.
+
+The corridor is a reference for direction and zone transitions; it is not drawn as a separate line. The visible line is the resource journey itself: corridor segments, node visits, and short return merges, smoothed for readability.
+
+The default limits are:
+
+- 100-yard node deviation from the corridor
+- 4 nodes per nearby cluster
+- 8 selected nodes per leg
+- 30-yard rolling re-plan distance
+- 100-yard ring distance
+
+All of these are adjustable in game.
+
+### Node display
+
+The display is intended to be immediately familiar to GatherMate2 users:
+
+- **World map:** 12 px node-specific icon at full alpha.
+- **Minimap:** 9 px icon at full alpha for every known node in the zone.
+- **Nearby nodes:** hollow circle inside the ring distance; all nearby nodes, not only the selected route.
+- **Rim nodes:** nodes just outside the minimap view fade onto the rim rather than disappearing abruptly.
+- **Route nodes:** the next node pulses; selected nodes stay visually connected to the dashed journey line.
+
+If the full node field feels too dense for a particular session, `/nt allnodes off` switches to a route-only view. Tracking filtering still applies.
+
+### Multi-zone travel
+
+Routes can cross continents and use real transport links. NodeTaxi stores the paired transition points and plans a leg for each zone along the route. If a zone has no generated corridor, or the leg is a transport link, it falls back to a visible start → selected nodes → destination line instead of leaving the zone blank.
+
+The route indicator always points toward the real exit for the current zone, then rebuilds after the zone change.
+
+### Requirements
+
+- **TomTom** — required dependency.
+- **WoW Forever 1.60.1**, Interface **16001**.
+- HereBeDragons is included with TomTom; no separate installation is needed.
+
+### Installation
 
 1. Install TomTom.
 2. Install NodeTaxi into `_forever_/Interface/AddOns/NodeTaxi`.
-3. `/reload`, then `/nt` for the command list.
+3. Restart or `/reload`.
+4. Run `/nt` in game for the command list.
 
-## Quick start
+### Quick start
 
-Set a TomTom waypoint in the destination zone, make sure your gathering tracking is active, then:
+Set a TomTom waypoint in the destination zone, make sure your gathering tracking is active, then run:
 
 ```
 /nt route
 ```
 
-For example:
+Example:
 
 ```
 /way #1429 42.0 65.0 Goldshire
 /nt route
 ```
 
-Open the world map and zoom out to Eastern Kingdoms to see the full multi-zone route. The current leg is bright; later legs are paler. The minimap shows the current area.
+Open the world map and zoom out to see the full route. The current leg is bright; future legs are paler.
 
-Useful first checks:
+Useful first commands:
 
 ```
 /nt preview      -- synthetic route to test the overlay
 /nt allnodes on  -- show every known node (default)
-/nt debug        -- client, tracking, position, snapshot and overlay state
+/nt debug        -- position, tracking, snapshot, overlay diagnostics
 ```
 
-## Common commands
+### Configuration
 
 | Command | Effect |
 | --- | --- |
-| `/nt route` | Build or rebuild the route to TomTom's arrow target |
-| `/nt stop` | Clear the drawn route |
+| `/nt route` | Build or rebuild the route to TomTom's active target |
+| `/nt stop` | Clear the route overlay |
 | `/nt dest` | Show the current TomTom target |
 | `/nt allnodes on\|off` | Toggle the full known-node field |
 | `/nt kind auto\|herb\|ore\|both` | Resource filter; `auto` follows active tracking |
-| `/nt max 8` | Maximum selected route nodes per leg |
-| `/nt cluster 4` | Maximum nodes selected from one nearby cluster |
-| `/nt spur 100` | Maximum yards a selected node may pull away from the route |
-| `/nt width 300` | Corridor search half-width in yards |
-| `/nt replan 30` | Movement before the remaining leg is re-evaluated (0 = off) |
-| `/nt ring 100` | Distance where any nearby icon becomes a hollow circle |
-| `/nt detour 1.8` | Route-length / direct-distance budget |
-| `/nt here [herb\|ore]` | Record a node at your current position |
-| `/nt near [yd]` | List known nodes around you and their source |
-| `/nt import gathermate2` | Import your local GatherMate2 herb/ore data |
+| `/nt max 8` | Maximum selected nodes per leg |
+| `/nt cluster 4` | Maximum nodes from one nearby cluster |
+| `/nt spur 100` | Maximum node deviation from the route |
+| `/nt width 300` | Corridor search half-width |
+| `/nt replan 30` | Movement before the current leg is re-evaluated |
+| `/nt ring 100` | Distance where icons become hollow circles |
+| `/nt detour 1.8` | Route-length budget relative to direct distance |
+| `/nt here [herb\|ore]` | Record a node at your position |
+| `/nt near [yd]` | List nearby known nodes and their source |
+| `/nt import gathermate2` | Import local GatherMate2 herb/ore data |
 | `/nt seed` | Show the baked snapshot version |
-| `/nt debug` | Print client, tracking, position, icon and snapshot diagnostics |
+| `/nt debug` | Print diagnostic information |
 
-Run `/nt` in game for the complete list, including log, validation, crossing and preview commands.
+Run `/nt` for the complete list, including log, validation, crossing and preview commands.
 
-## Data notes
+### Data sources
 
-The baked snapshot is from **GatherMate2 Data Wowhead classic v2026-11-05** (Forever tables), a Wowhead-derived package by Marrtin based on Spinx's classic data and Wowhead coordinate submissions.
+The baked snapshot is built from **GatherMate2 Data Wowhead classic v2026-11-05** (Forever tables), a Wowhead-derived package by Marrtin based on Spinx's classic data and Wowhead coordinate submissions.
 
 - **13,332 herbs + 10,495 ore = 23,827 nodes** across 44 zones.
-- Nine Tirisfal veins from the player's saved NodeTaxi scan are merged via `tools/extra_nodes.json`.
+- Nine Tirisfal veins from the player's saved NodeTaxi scan are merged through `tools/extra_nodes.json`.
 - Mount Hyjal and Shen'dralas currently have no baked nodes.
-- Coordinates are user submissions at roughly two-decimal precision; treat markers as approximate and use the rings to confirm live nodes.
+- Coordinates are user submissions at roughly two-decimal precision. Treat markers as approximate and confirm live nodes with the tracking dot and rings.
 
 Node IDs and matching artwork come from GatherMate2's tables and `Artwork/` folder. See `ATTRIBUTION.md` for full credits and third-party terms.
 
-## Limitations
+### Limitations
 
 - **Not an autopilot.** The route is a suggestion. Terrain between published points is not fully modelled; cliffs, water, walls and flight paths are not avoided.
-- **Side-trips use local distance**, not a full walkability mesh. Zones without a generated corridor, and transport legs, use a fallback line through the selected nodes or leg endpoints.
-- **The snapshot can be stale.** Let NodeTaxi learn from your casts and use `/nt import gathermate2` after updating GatherMate2 data.
-- **The all-node field is intentionally dense.** Use `/nt allnodes off` for a route-only view, or lower the ring distance.
-- NodeTaxi is herb/ore only; it does not route to fishing pools or treasure.
+- **Side-trips use local distance**, not a complete walkability mesh. Transport legs and zones without a generated corridor use fallback lines.
+- **The snapshot can be stale.** Let NodeTaxi learn from your casts and use `/nt import gathermate2` after updating GatherMate2.
+- **The all-node field is intentionally dense.** Turn it off or lower the ring distance if it feels busy.
+- **Herb and ore only.** NodeTaxi does not route to fishing pools or treasure.
+- **No TomTom changes.** NodeTaxi never adds, removes, or retargets TomTom waypoints.
 
-## Credits
+### Troubleshooting
+
+- `/nt debug` prints client build, tracking state, position, snapshot version, and overlay status.
+- `/nt seed` confirms the baked data version.
+- `/nt near 100` lists what NodeTaxi knows around you and whether each node came from the snapshot, an import, or a scan.
+- `/nt allnodes off` gives a route-only view.
+- If a route is empty, set the TomTom target to a zone map and run `/nt route` again.
+- If the route shape is wrong, include the zone, tracking type and a screenshot in a GitHub issue.
+
+### Privacy
+
+NodeTaxi has no network code. It does not send data anywhere. Node data and settings live in your local SavedVariables.
+
+### Support
+
+Source, issue tracker and release history: https://github.com/rmburgess-dev/NodeTaxi
+
+When reporting a problem, include the NodeTaxi version, `/nt debug` output, the zone, your active tracking type, and whether the route was cross-zone.
+
+### Credits
 
 TomTom (Cladhaire, Ludovicus), HereBeDragons (Nevcairiel), GatherMate2 and GatherMate2_Data (Nevcairiel, kagaro, Xinhuan, Spinx, Marrtin), Carbonite transition data, the Shortest Path Forever navmesh work, Wowhead contributors, and Blizzard's world data.
 
-**Source:** https://github.com/rmburgess-dev/NodeTaxi
+**License:** NodeTaxi code is MIT. Baked data and artwork retain their third-party terms; see `LICENSE`, `LICENSE-GPL-3.0.txt` and `ATTRIBUTION.md` in the repository.
+
+**Current release:** 0.9.26.
+
+## Deutsch
+
+NodeTaxi ist eine Ergänzung für **TomTom**, die aus dem aktuellen Pfeilziel eine sammlerfreundliche Route macht. Statt nur den nächsten Wegpunkt anzuzeigen, zeichnet NodeTaxi eine gestrichelte gelbe Linie vom Spieler zum Ziel, folgt einem verborgenen Zonenkorridor und macht kurze Abstecher zu Kräutern und Erzen in der Nähe.
+
+Wichtigste Funktionen:
+
+- TomTom bleibt unverändert: kein neuer Wegpunkt, kein bewegter Pfeil, kein geändertes Ziel.
+- Die Route folgt dem aktiven Sammel-Tracking: Find Minerals für Erz, Find Herbs für Kräuter.
+- 23.827 gebackene Knoten in 44 Forever-Zonen.
+- Alle bekannten Knoten auf Weltkarte und Minimap, auch ohne aktive Route.
+- Darstellung wie GatherMate2: 12-px-Symbole auf der Weltkarte, 9 px auf der Minimap, volle Deckkraft.
+- Knoten innerhalb von 100 Yards werden zu hohlen Kreisen, damit der eigene Tracking-Punkt sichtbar bleibt.
+- Echte Zonenübergänge über 63 Carbonite-Paare; ausgewählte Knoten in jeder Zone.
+- Kurze Nebenwege mit maximal 4 Knoten pro Cluster und 8 pro Etappe.
+
+Voraussetzungen: **TomTom**, **WoW Forever 1.60.1 / Interface 16001**. Installation nach `_forever_/Interface/AddOns/NodeTaxi`, danach `/reload` und `/nt`.
+
+Grenzen: keine vollständige Navigation, keine Geländevermeidung, Fallback-Linien für Transport- und unvollständige Zonen, Daten-Snapshot kann veraltet sein. Keine Netzwerkverbindung; alle Daten bleiben lokal.
+
+Quelle und Support: https://github.com/rmburgess-dev/NodeTaxi
+
+## Français
+
+NodeTaxi est un compagnon de **TomTom** qui transforme votre destination actuelle en un trajet de récolte. Il trace une ligne jaune pointillée vers la cible TomTom, suit un corridor de déplacement masqué entre les zones et fait de courts détours vers les herbes et minerais proches.
+
+Points principaux :
+
+- TomTom reste intact : aucun waypoint ajouté, aucune flèche déplacée, aucune destination remplacée.
+- La route suit le pistage actif : Find Minerals pour le minerai, Find Herbs pour les herbes.
+- 23 827 nœuds intégrés dans 44 zones de WoW Forever.
+- Tous les nœuds connus sur la carte du monde et la minicarte, même sans route active.
+- Présentation proche de GatherMate2 : icônes de 12 px sur la carte, 9 px sur la minicarte, alpha complet.
+- Les nœuds à moins de 100 yards deviennent des cercles creux pour laisser visible le point de pistage du jeu.
+- Vrais passages entre zones via 63 paires Carbonite ; sélection de nœuds dans chaque zone.
+- Détours courts : 4 nœuds maximum par groupe, 8 par étape.
+
+Prérequis : **TomTom**, **WoW Forever 1.60.1 / Interface 16001**. Installez dans `_forever_/Interface/AddOns/NodeTaxi`, puis `/reload` et `/nt`.
+
+Limites : pas d'autopilote, pas d’évitement complet du terrain, lignes de secours pour les transports et zones sans corridor, instantané de données potentiellement ancien. Aucun accès réseau ; les données restent locales.
+
+Source et support : https://github.com/rmburgess-dev/NodeTaxi
+
+## Español
+
+NodeTaxi es un complemento para **TomTom** que convierte tu destino actual en una ruta de recolección. Dibuja una línea amarilla discontinua hacia el objetivo de TomTom, sigue un corredor oculto entre zonas y hace pequeños desvíos hacia hierbas y minerales cercanos.
+
+Características principales:
+
+- TomTom permanece intacto: no se añaden waypoints, no se mueve la flecha y no se cambia el destino.
+- La ruta sigue el rastreo activo: Find Minerals para mineral, Find Herbs para hierbas.
+- 23.827 nodos incluidos en 44 zonas de WoW Forever.
+- Todos los nodos conocidos en el mapa del mundo y el minimapa, incluso sin ruta activa.
+- Presentación similar a GatherMate2: iconos de 12 px en el mapa, 9 px en el minimapa, alpha completo.
+- Los nodos a menos de 100 yardas se convierten en círculos huecos para dejar visible el punto de rastreo del juego.
+- Transiciones reales entre zonas mediante 63 pares de Carbonite; nodos seleccionados en cada zona.
+- Desvíos cortos: máximo 4 nodos por grupo y 8 por tramo.
+
+Requisitos: **TomTom**, **WoW Forever 1.60.1 / Interface 16001**. Instala en `_forever_/Interface/AddOns/NodeTaxi`, luego `/reload` y `/nt`.
+
+Limitaciones: no es un piloto automático, no evita todo el terreno, usa líneas de respaldo para transportes y zonas sin corredor, y la instantánea de datos puede estar desactualizada. Sin conexión de red; los datos permanecen locales.
+
+Fuente y soporte: https://github.com/rmburgess-dev/NodeTaxi

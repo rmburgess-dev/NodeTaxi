@@ -406,6 +406,9 @@ function NodeTaxi:RedrawWorld()
         return NodeTaxi:MapPointToCanvas(mapID, x, y, topMapID, width, height)
     end
 
+    local playerMap, px, py = self:GetPlayerZone()
+    local ringDistance = (self.settings and self.settings.ring) or 0
+
     -- Every known node under the map currently open, independent of route and
     -- exploration. This also works with no active route.
     if self.settings and self.settings.allNodes then
@@ -426,7 +429,16 @@ function NodeTaxi:RedrawWorld()
                     local nx, ny = ToScreen(zone.map, node.x, node.y)
                     if nx then
                         drawn[key] = true
-                        DrawWorldIcon(worldMarkers, frame, nx, ny, 12, NodeIcon(node), 1)
+                        local close = false
+                        if ringDistance > 0 and playerMap and px and node.map == playerMap then
+                            local distance = self:DistanceOnMap(playerMap, px, py, node.x, node.y)
+                            close = distance and distance <= ringDistance
+                        end
+                        if close then
+                            DrawWorldRing(worldLines, frame, nx, ny, 8, NodeColor(node), 1.5)
+                        else
+                            DrawWorldIcon(worldMarkers, frame, nx, ny, 12, NodeIcon(node), 1)
+                        end
                     end
                 end
             end
@@ -439,7 +451,6 @@ function NodeTaxi:RedrawWorld()
 
     local points = {}
 
-    local playerMap, px, py = self:GetPlayerZone()
     if playerMap and px then
         local sx, sy = ToScreen(playerMap, px, py)
         if sx then
@@ -534,7 +545,6 @@ function NodeTaxi:RedrawWorld()
         DrawDashes(worldLines, frame, a.x, a.y, b.x, b.y, 9, 7, thickness, color)
     end
 
-    local ringDistance = (self.settings and self.settings.ring) or 0
     local pulse = 0.65 + 0.35 * sin(GetTime() * 4)
 
     for _, point in ipairs(points) do
@@ -626,6 +636,8 @@ function NodeTaxi:RedrawMinimap()
         return
     end
     local maxRadius = min(halfWidth, halfHeight) * 1.02
+    local mask = GetMinimapMask()
+    local ringDistance = (self.settings and self.settings.ring) or 0
 
     local rotate = GetCVar("rotateMinimap") == "1"
     local sinFacing, cosFacing
@@ -684,7 +696,13 @@ function NodeTaxi:RedrawMinimap()
                         end
                     end
                     if alpha > 0 then
-                        DrawMinimapIcon(minimapMarkers, frame, u, v, 9, NodeIcon(node), alpha)
+                        local dx, dy = playerX - wx, playerY - wy
+                        local distance = sqrt(dx * dx + dy * dy)
+                        if ringDistance > 0 and distance <= ringDistance and screenDistance <= maxRadius then
+                            DrawMinimapRing(minimapLines, frame, u, v, 7, NodeColor(node), 1.5, mask)
+                        else
+                            DrawMinimapIcon(minimapMarkers, frame, u, v, 9, NodeIcon(node), alpha)
+                        end
                     end
                 end
             end
@@ -742,7 +760,6 @@ function NodeTaxi:RedrawMinimap()
 
     local lineSet = minimapLines
     local parent = frame
-    local mask = GetMinimapMask()
     local pathColor = route.preview and COLORS.preview or COLORS.path
 
     local function DrawMinimapDashes(x1, y1, x2, y2, color)
@@ -780,7 +797,6 @@ function NodeTaxi:RedrawMinimap()
         DrawMinimapDashes(a.x, a.y, b.x, b.y, color)
     end
 
-    local ringDistance = (self.settings and self.settings.ring) or 0
     local pulse = 0.65 + 0.35 * sin(GetTime() * 4)
 
     for _, point in ipairs(points) do

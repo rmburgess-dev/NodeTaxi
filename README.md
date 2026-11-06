@@ -128,8 +128,8 @@ baked snapshot lives in `data.lua` and is never written to saved variables.
   `Media/`; node IDs from the snapshot select the icon. Learned nodes inherit
   the nearest snapshot node's ID, and GatherMate2 imports preserve the ID.
   A node with no known species uses the generic Herb Gathering/Mining icon.
-  Within `ring` yards the icon is replaced by a hollow ring, so the game's own
-  tracking dot remains visible in the middle.
+  Within `ring` yards any node in the field is replaced by a hollow ring, so the
+  game's own tracking dot remains visible in the middle.
 * The planner is pure Lua (`route.lua`), so it runs without the WoW API and is
   covered by unit tests.
 

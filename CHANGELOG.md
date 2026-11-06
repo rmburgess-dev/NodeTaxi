@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.25 - 2026-11-05
+
+- Fix nearby-node markers: every known node within `/nt ring` now switches to
+  the hollow circle on both the world map and minimap, not only route-selected
+  nodes. This removes the small GatherMate-style icon appearing under/next to
+  the circle.
+
 ## 0.9.24 - 2026-11-05
 
 - Rebuilt the baked snapshot from the updated Wowhead-derived

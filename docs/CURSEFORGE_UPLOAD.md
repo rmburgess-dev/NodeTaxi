@@ -7,9 +7,15 @@
 - **Summary:** NodeTaxi turns your TomTom target into a gathering-friendly journey: a smooth dashed route along real zone transitions, with short side-trips through nearby herbs and ore. 23,827 baked nodes, GatherMate2-style icons, and a full multi-zone map.
 - **Category:** Map & Minimap
 - **Game version:** WoW Forever 1.60.1 (Interface 16001)
-- **License:** Other / custom — point at the repository `LICENSE`. The code is
-  MIT, but `data.lua`, `transitions.lua` and `Media/` contain third-party data/art with their own
-  terms (see `ATTRIBUTION.md`). Do not select plain MIT for the whole package.
+- **License:** **Other / custom** — use the repository `LICENSE` as the
+  license URL. The code is MIT, but `data.lua`, `transitions.lua` and `Media/`
+  contain third-party data/art with their own terms (see `ATTRIBUTION.md`).
+  Do not select plain MIT or plain GPL for the whole package.
+- **License URL:** https://github.com/rmburgess-dev/NodeTaxi/blob/main/LICENSE
+- **Project Distribution:** **Off** for the first upload. This disables
+  third-party API distribution while the project remains available on
+  CurseForge. The artwork is marked All Rights Reserved; do not authorize
+  third-party redistribution until you have permission or replace it.
 - **Source:** https://github.com/rmburgess-dev/NodeTaxi
 - **Required dependency:** TomTom (CurseForge project 18808 / slug `tomtom`)
 
@@ -54,8 +60,13 @@ Expected archive: `NodeTaxi/NodeTaxi.toc` at the top level, 51 files, no
 
 ## Third-party content note
 
-`data.lua` is derived from *GatherMate2 Data Wowhead classic* (Forever tables)
-and `Media/` is copied from GatherMate2's artwork folder, which is marked ARR.
-Both are attributed in `ATTRIBUTION.md`; neither is covered by NodeTaxi's MIT
-grant. CurseForge may ask about redistribution rights; have an answer ready
-(permission, replacement art, or an import-only data model).
+`data.lua` is derived from *GatherMate2 Data Wowhead classic* (Forever tables),
+`transitions.lua` and `corridors.lua` are GPLv3 data, and `Media/` is copied
+from GatherMate2's artwork folder, which is marked ARR. All are attributed in
+`ATTRIBUTION.md`; none is covered by NodeTaxi's MIT grant.
+
+This is why the project license is **Other / custom**, not MIT or GPL alone.
+The conservative distribution choice is **Off** until the ARR artwork is
+permissioned or replaced. If you later enable API distribution, confirm the
+artwork permission first and keep `LICENSE`, `LICENSE-GPL-3.0.txt` and
+`ATTRIBUTION.md` in the project/source distribution.

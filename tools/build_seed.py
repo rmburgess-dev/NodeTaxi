@@ -3,7 +3,7 @@
 
 Usage:
     python3 tools/build_seed.py /path/to/GatherMate2_Data/Forever \
-        [--version gathermate2-forever-2026-11-05]
+        [--version gathermate2-forever-2026-11-08+scans]
 
 The source files are plain Lua assignments:
 
@@ -71,7 +71,7 @@ def write_zones(out, name, zones, indent="    "):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data_dir", type=Path)
-    parser.add_argument("--version", default="gathermate2-forever-2026-11-05")
+    parser.add_argument("--version", default="gathermate2-forever-2026-11-08+scans")
     parser.add_argument("--out", type=Path, default=Path(__file__).resolve().parent.parent / "data.lua")
     parser.add_argument("--extra", type=Path,
         default=Path(__file__).resolve().parent / "extra_nodes.json")

@@ -16,7 +16,7 @@ reads the active target once at login) to learn *where* you are going.
 
 ## What it does
 
-1. Starts with **23,827 baked herb/ore nodes** across 44 Forever zones, then
+1. Starts with **23,842 baked herb/ore nodes** across 44 Forever zones, then
    learns more from your own **Herb Gathering** and **Mining** casts and
    manual `/nt here` marks. By default it follows the player's *active*
    minimap tracking (Find Herbs or Find Minerals) and only routes to that
@@ -234,13 +234,13 @@ applies (`/nt kind auto`).
 ### Baked Forever snapshot (included)
 
 `data.lua` is generated from the **Forever** tables of *GatherMate2 Data
-Wowhead classic* `v2026-11-05`, a Wowhead-derived package by Marrtin based on
+Wowhead classic* `v2026-11-08`, a Wowhead-derived package by Marrtin based on
 Spinx's classic data. It keeps each node's coordinate key **and** its
 GatherMate2 node ID, so the matching resource art can be selected:
 
-* **13,332 herbs + 10,495 ore = 23,827 nodes** across 44 zones. The updated
+* **13,332 herbs + 10,510 ore = 23,842 nodes** across 44 zones. The updated
   Wowhead-derived package has the same base coordinates as the prior bake;
-  nine saved Tirisfal veins are merged in from `tools/extra_nodes.json`.
+  24 unique saved nodes are merged in from `tools/extra_nodes.json` (23 Durotar, 1 Tirisfal).
 * Includes the new **Zephras Isle (2521)** and **Riverglades (2548)** zones.
 * Compared with the mature Classic Era table, about 92% of the coordinate keys
   overlap; the remainder is new or changed.
@@ -342,7 +342,7 @@ survives a session and can be inspected offline.
   route is a suggestion, not an autopilot. Re-planning every 30 yards does not
   know about obstacles either.
 * **Node data is a snapshot, not authoritative.** The baked data is from
-  2026-11-05 and is Wowhead-derived; it can be stale, incomplete, or from a
+  2026-11-08 and is Wowhead-derived; it can be stale, incomplete, or from a
   different phase. Mount Hyjal and Shen'dralas have no baked nodes yet. Learned
   nodes that do not match any snapshot node have no species ID, so they use the
   generic herb/ore icon. Let the addon learn from your own harvests and use

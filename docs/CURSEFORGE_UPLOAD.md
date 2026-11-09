@@ -4,7 +4,7 @@
 
 - **Name:** NodeTaxi
 - **Slug:** nodetaxi
-- **Summary:** NodeTaxi turns your TomTom target into a gathering-friendly journey: a smooth dashed route along real zone transitions, with short side-trips through nearby herbs and ore. 23,827 baked nodes, GatherMate2-style icons, and a full multi-zone map.
+- **Summary:** NodeTaxi turns your TomTom target into a gathering-friendly journey: a smooth dashed route along real zone transitions, with short side-trips through nearby herbs and ore. 23,842 baked nodes, GatherMate2-style icons, and a full multi-zone map.
 - **Category:** Map & Minimap
 - **Game version:** WoW Forever 1.60.1 (Interface 16001)
 - **License:** **Other / custom** — use the repository `LICENSE` as the
@@ -21,7 +21,7 @@
 
 ## Files
 
-- **Upload:** `dist/NodeTaxi-0.9.28.zip`
+- **Upload:** `dist/NodeTaxi-0.9.29.zip`
 - **Project icon:** `docs/icon-256.png` (or `docs/icon-512.png`)
 - **Description:** paste `docs/CURSEFORGE.md` (English first, then Deutsch/Français/Español)
 - **Release type:** Beta (first public release, Forever data snapshot)
@@ -29,7 +29,7 @@
 ## Upload steps
 
 1. Create the project with the fields above.
-2. Upload `NodeTaxi-0.9.28.zip` for game version 1.60.1.
+2. Upload `NodeTaxi-0.9.29.zip` for game version 1.60.1.
 3. Paste the description from `docs/CURSEFORGE.md`.
 4. Upload the icon.
 5. Add TomTom as a required dependency.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.29 - 2026-11-08
+
+- Rebuild from the current GatherMate2/Wowhead Forever package. Its base
+  counts remain 13,332 herbs and 10,486 ore.
+- Merge 24 genuinely new nodes after a 12-yard dedupe: 23 Durotar ore nodes
+  from the saved NodeTaxi scan and one new Tirisfal node from GatherMate2.
+- Baked total: **13,332 herbs + 10,510 ore = 23,842 nodes**.
+- Fix a Lua 5.4 loop-variable reassignment in the GatherMate2 import path.
+
 ## 0.9.28 - 2026-11-05
 
 - Keep one short “route updated: N nodes, Z zones” line for automatic

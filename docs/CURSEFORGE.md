@@ -14,7 +14,7 @@ It is designed for players who want to keep moving toward a destination while pi
 
 - **TomTom-native, read-only routing.** Your arrow and destination stay exactly where TomTom put them. NodeTaxi only reads the active arrow target.
 - **Follows your gathering tracking.** With Find Minerals active, the route targets ore. With Find Herbs, it targets herbs. Switching tracking rebuilds the route. You can override this with `/nt kind auto|herb|ore|both`.
-- **23,827 baked herb and ore nodes** across 44 WoW Forever zones, including Zephras Isle and Riverglades.
+- **23,842 baked herb and ore nodes** across 44 WoW Forever zones, including Zephras Isle and Riverglades.
 - **Every known node is shown.** The world map and minimap draw the full known-node field, whether the zone is explored or not, and even with no active route.
 - **GatherMate2-style presentation.** Node-specific artwork at 12 px on the world map and 9 px on the minimap, full alpha, using the same GatherMate2 artwork that players already know.
 - **Hollow rings up close.** Inside `/nt ring` — 100 yards by default — every nearby node changes from an icon to a hollow circle, keeping the game's own tracking dot visible in the middle. This applies to the whole node field, not only the selected route.
@@ -134,9 +134,9 @@ Run `/nt` for the complete list, including log, validation, crossing and preview
 
 ### Data sources
 
-The baked snapshot is built from **GatherMate2 Data Wowhead classic v2026-11-05** (Forever tables), a Wowhead-derived package by Marrtin based on Spinx's classic data and Wowhead coordinate submissions.
+The baked snapshot is built from **GatherMate2 Data Wowhead classic v2026-11-08** (Forever tables), a Wowhead-derived package by Marrtin based on Spinx's classic data and Wowhead coordinate submissions.
 
-- **13,332 herbs + 10,495 ore = 23,827 nodes** across 44 zones.
+- **13,332 herbs + 10,510 ore = 23,842 nodes** across 44 zones.
 - Nine Tirisfal veins from the player's saved NodeTaxi scan are merged through `tools/extra_nodes.json`.
 - Mount Hyjal and Shen'dralas currently have no baked nodes.
 - Coordinates are user submissions at roughly two-decimal precision. Treat markers as approximate and confirm live nodes with the tracking dot and rings.
@@ -177,7 +177,7 @@ TomTom (Cladhaire, Ludovicus), HereBeDragons (Nevcairiel), GatherMate2 and Gathe
 
 **License:** NodeTaxi code is MIT. Baked data and artwork retain their third-party terms; see `LICENSE`, `LICENSE-GPL-3.0.txt` and `ATTRIBUTION.md` in the repository.
 
-**Current release:** 0.9.28.
+**Current release:** 0.9.29.
 
 ## Deutsch
 

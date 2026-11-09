@@ -908,8 +908,8 @@ function NodeTaxi:ImportGatherMate2()
     local grids, touchedZones = {}, {}
 
     for _, source in ipairs(sources) do
-        for zone, coords in pairs(source.data) do
-            zone = tonumber(zone)
+        for zoneKey, coords in pairs(source.data) do
+            local zone = tonumber(zoneKey)
             if zone and type(coords) == "table" then
                 local grid = grids[zone]
                 if grid == nil then

@@ -177,7 +177,7 @@ function NodeTaxi:DistanceOnMap(mapID, ax, ay, bx, by)
 end
 
 local NODE_MERGE_YARDS = 12
-local GATHERMATE_MERGE_YARDS = 12
+local NODE_MATCH_YARDS = 12
 local SEED_MATCH_YARDS = 60
 local LOG_LIMIT = 300
 
@@ -426,10 +426,10 @@ NodeTaxi.FormatLogEntry = FormatLogEntry
     node, so anything within NODE_MERGE_YARDS is treated as the same node.
 ----------------------------------------------------------------------------]]
 
--- GatherMate2 / baked-snapshot coordinate key:
+-- Baked-snapshot coordinate key:
 --   round(x*10000) * 1000000 + round(y*10000) * 100
 -- returns normalised x, y (0..1) or nil for a bad key.
-local function DecodeGatherMateKey(key)
+local function DecodeNodeKey(key)
     local numeric = tonumber(key)
     if not numeric then
         return nil
@@ -443,9 +443,9 @@ local function DecodeGatherMateKey(key)
 
     return x, y
 end
-NodeTaxi.DecodeGatherMateKey = DecodeGatherMateKey
+NodeTaxi.DecodeNodeKey = DecodeNodeKey
 
--- GatherMate2 / baked-snapshot coordinate key:
+-- Baked-snapshot coordinate key:
 --   round(x*10000) * 1000000 + round(y*10000) * 100
 -- returns normalised x, y (0..1) or nil for a bad key.
 function NodeTaxi:AddNode(mapID, x, y, kind, quiet)
@@ -600,8 +600,8 @@ function NodeTaxi:NodeListForMap(mapID)
     end
 
     local function cellKey(x, y)
-        return math.floor(x * width / GATHERMATE_MERGE_YARDS) .. ":"
-            .. math.floor(y * height / GATHERMATE_MERGE_YARDS)
+        return math.floor(x * width / NODE_MATCH_YARDS) .. ":"
+            .. math.floor(y * height / NODE_MATCH_YARDS)
     end
 
     local function addPoint(x, y, kind)
@@ -615,8 +615,8 @@ function NodeTaxi:NodeListForMap(mapID)
     end
 
     local function nearPoint(x, y, kind)
-        local cx = math.floor(x * width / GATHERMATE_MERGE_YARDS)
-        local cy = math.floor(y * height / GATHERMATE_MERGE_YARDS)
+        local cx = math.floor(x * width / NODE_MATCH_YARDS)
+        local cy = math.floor(y * height / NODE_MATCH_YARDS)
 
         for ox = -1, 1 do
             for oy = -1, 1 do
@@ -627,7 +627,7 @@ function NodeTaxi:NodeListForMap(mapID)
                         if other.kind == kind then
                             local dx = (other.x - x) * width
                             local dy = (other.y - y) * height
-                            if dx * dx + dy * dy <= GATHERMATE_MERGE_YARDS * GATHERMATE_MERGE_YARDS then
+                            if dx * dx + dy * dy <= NODE_MATCH_YARDS * NODE_MATCH_YARDS then
                                 return true
                             end
                         end
@@ -653,7 +653,7 @@ function NodeTaxi:NodeListForMap(mapID)
         end
 
         for i = 1, #keys do
-            local x, y = DecodeGatherMateKey(keys[i])
+            local x, y = DecodeNodeKey(keys[i])
             if x and not nearPoint(x, y, kind) and not coarseNear(x, y, kind) then
                 result[#result + 1] = {
                     map = mapID,
@@ -713,7 +713,7 @@ function NodeTaxi:NearestSeed(mapID, x, y, kind)
 
     local bestDistance, bestX, bestY, bestID
     for i = 1, #keys do
-        local sx, sy = DecodeGatherMateKey(keys[i])
+        local sx, sy = DecodeNodeKey(keys[i])
         if sx then
             local dx, dy = (sx - x) * width, (sy - y) * height
             local distance = dx * dx + dy * dy
@@ -751,217 +751,6 @@ function NodeTaxi:NearestStored(mapID, x, y, kind)
         return math.sqrt(bestDistance), bestNode
     end
     return nil
-end
-
---[[ GatherMate2 import ------------------------------------------------------
-    GatherMate2 stores node positions in saved variables:
-        GatherMate2HerbDB[uiMapID][coordKey] = nodeID
-        GatherMate2MineDB[uiMapID][coordKey] = nodeID
-    coordKey = round(x*10000) * 1000000 + round(y*10000) * 100
-    (see GatherMate2:EncodeLoc / DecodeLoc).
-
-    Importing from the user's own installed copy keeps the data local:
-    NodeTaxi does not bundle or redistribute it. The user imports the data
-    package into GatherMate2 first (/gathermate -> Import).
-----------------------------------------------------------------------------]]
-local function GetGatherMateSources()
-    local sources = {}
-
-    local function add(name, kind)
-        local data = _G[name]
-        if type(data) == "table" and next(data) then
-            sources[#sources + 1] = { data = data, kind = kind, name = name }
-        end
-    end
-
-    -- Only the GatherMate2 databases, i.e. after the user imported a data
-    -- package there. The raw data-addon tables can contain retail-only maps
-    -- and would pollute the route database on this client.
-    add("GatherMate2HerbDB", "herb")
-    add("GatherMate2MineDB", "ore")
-
-    return sources
-end
-NodeTaxi.GetGatherMateSources = GetGatherMateSources
-
--- A cheap spatial index for a zone: keeps imports linear and makes a second
--- import idempotent (anything within 12 yards of a node of the same kind is
--- treated as the same node).
-local function NewMergeGrid(mapID)
-    local width, height = NodeTaxi:GetZoneSize(mapID)
-    if not width or not height then
-        return nil
-    end
-
-    local list = db.nodes[mapID]
-    if not list then
-        list = {}
-        db.nodes[mapID] = list
-    end
-
-    local grid = {}
-    local coarse = {}
-
-    local function coarseCellKey(x, y)
-        return math.floor(x * width / SEED_MATCH_YARDS) .. ":"
-            .. math.floor(y * height / SEED_MATCH_YARDS)
-    end
-
-    local function coarseAdd(x, y, kind)
-        local key = coarseCellKey(x, y)
-        local bucket = coarse[key]
-        if not bucket then
-            bucket = {}
-            coarse[key] = bucket
-        end
-        bucket[#bucket + 1] = { x = x, y = y, kind = kind }
-    end
-
-    local function coarseNear(x, y, kind)
-        local cx = math.floor(x * width / SEED_MATCH_YARDS)
-        local cy = math.floor(y * height / SEED_MATCH_YARDS)
-
-        for ox = -1, 1 do
-            for oy = -1, 1 do
-                local bucket = coarse[(cx + ox) .. ":" .. (cy + oy)]
-                if bucket then
-                    for i = 1, #bucket do
-                        local other = bucket[i]
-                        if other.kind == kind then
-                            local dx = (other.x - x) * width
-                            local dy = (other.y - y) * height
-                            if dx * dx + dy * dy <= SEED_MATCH_YARDS * SEED_MATCH_YARDS then
-                                return true
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        return false
-    end
-
-    local function cellKey(x, y)
-        return math.floor(x * width / GATHERMATE_MERGE_YARDS) .. ":"
-            .. math.floor(y * height / GATHERMATE_MERGE_YARDS)
-    end
-
-    local function index(node)
-        local key = cellKey(node.x, node.y)
-        local bucket = grid[key]
-        if not bucket then
-            bucket = {}
-            grid[key] = bucket
-        end
-        bucket[#bucket + 1] = node
-    end
-
-    local function add(node)
-        list[#list + 1] = node
-        index(node)
-    end
-
-    for i = 1, #list do
-        index(list[i])
-    end
-
-    local function near(x, y, kind)
-        local cx = math.floor(x * width / GATHERMATE_MERGE_YARDS)
-        local cy = math.floor(y * height / GATHERMATE_MERGE_YARDS)
-
-        for ox = -1, 1 do
-            for oy = -1, 1 do
-                local bucket = grid[(cx + ox) .. ":" .. (cy + oy)]
-                if bucket then
-                    for i = 1, #bucket do
-                        local node = bucket[i]
-                        if node.kind == kind then
-                            local dx = (node.x - x) * width
-                            local dy = (node.y - y) * height
-                            if dx * dx + dy * dy <= GATHERMATE_MERGE_YARDS * GATHERMATE_MERGE_YARDS then
-                                return true
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        return false
-    end
-
-    return { list = list, add = add, near = near }
-end
-
-function NodeTaxi:ImportGatherMate2()
-    InitSettingsIfNeeded()
-
-    local sources = GetGatherMateSources()
-    if #sources == 0 then
-        Print("no GatherMate2 data found.")
-        Print("install GatherMate2 (Forever build) plus a GatherMate2 data package, import it in /gathermate -> Import, then run /nt import gathermate2.")
-        return
-    end
-
-    local imported, skipped, invalid = 0, 0, 0
-    local grids, touchedZones = {}, {}
-
-    for _, source in ipairs(sources) do
-        for zoneKey, coords in pairs(source.data) do
-            local zone = tonumber(zoneKey)
-            if zone and type(coords) == "table" then
-                local grid = grids[zone]
-                if grid == nil then
-                    grid = NewMergeGrid(zone) or false
-                    grids[zone] = grid
-                end
-
-                if grid then
-                    for key, nodeID in pairs(coords) do
-                        local x, y = DecodeGatherMateKey(key)
-                        if x then
-                            if grid.near(x, y, source.kind) then
-                                skipped = skipped + 1
-                            else
-                                grid.add({
-                                    x = x,
-                                    y = y,
-                                    kind = source.kind,
-                                    nodeID = tonumber(nodeID),
-                                    count = 1,
-                                    last = time(),
-                                    src = "gathermate2",
-                                    coarse = true,
-                                })
-                                imported = imported + 1
-                                touchedZones[zone] = true
-                            end
-                        else
-                            invalid = invalid + 1
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    local zoneCount = 0
-    for _ in pairs(touchedZones) do
-        zoneCount = zoneCount + 1
-    end
-
-    Print(string.format("GatherMate2 import: %d new node(s), %d duplicate(s), %d bad key(s), %d zone(s) touched.",
-        imported, skipped, invalid, zoneCount))
-
-    if imported == 0 then
-        Print("nothing new. Make sure the data was imported into GatherMate2 first (/gathermate -> Import).")
-        return
-    end
-
-    if state.route then
-        self:BuildRoute(false)
-    end
 end
 
 --[[ TomTom integration (read only) -----------------------------------------
@@ -2983,7 +2772,6 @@ local function PrintHelp()
     Print("  /nt near [yd]      list known nodes around you, with their source")
     Print("  /nt validate       compare this spot with the baked snapshot")
     Print("  /nt log [n|clear|chat on|off]  persistent diagnostic log")
-    Print("  /nt import gathermate2  copy nodes out of your local GatherMate2 data")
     Print("  /nt seed           show the baked Forever snapshot version")
     Print("  /nt skip           skip the current node")
     Print("  /nt preview        draw a synthetic route to check the overlay")
@@ -3063,9 +2851,6 @@ local function PrintDebug()
     local info = NodeTaxi.OverlayDebugInfo and NodeTaxi:OverlayDebugInfo()
     Print("world map overlay: " .. (info and info.world or "not created yet"))
     Print("minimap overlay: " .. (info and info.minimap or "not created yet"))
-
-    local sources = GetGatherMateSources()
-    Print("GatherMate2 data: " .. (#sources > 0 and ("detected (" .. #sources .. " table(s))") or "not found"))
 
     Print(string.format("tracking: active %s, filter %s -> using %s",
         tostring(NodeTaxi:DetectTracking() or "none"), settings.kind, NodeTaxi:GetEffectiveKind()))
@@ -3298,14 +3083,6 @@ local function HandleCommand(message)
         Print(string.format("remembered a %s node at %s (%s)%s.",
             kind, CoordText(x, y), MapName(mapID) or "?",
             seedDistance and string.format("; nearest baked %.0f yd", seedDistance) or ""))
-
-    elseif command == "import" then
-        local what = rest:lower()
-        if what == "" or what == "gathermate2" or what == "gathermate" then
-            NodeTaxi:ImportGatherMate2()
-        else
-            Print("usage: /nt import gathermate2")
-        end
 
     elseif command == "seed" then
         local seed = NodeTaxi.SeedData
@@ -3681,9 +3458,6 @@ local function OnEvent(_, event, ...)
             Print(string.format("loaded. %d node(s) known. /nt for commands.", NodeTaxi:NodeCount(nil)))
         end
 
-        if NodeTaxi:NodeCount(nil) < 50 and #GetGatherMateSources() > 0 then
-            Notify("GatherMate2 data detected. /nt import gathermate2 to seed the routes.")
-        end
 
     elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
         if not db then

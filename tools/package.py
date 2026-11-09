@@ -5,8 +5,8 @@ Usage (from the addon folder):
     python3 tools/package.py
 
 Creates dist/NodeTaxi-<version>.zip with a single top-level NodeTaxi/ folder.
-Only runtime files, Media and the release docs are included; tests, tools,
-docs, .git and .pkgmeta stay out.
+Only runtime files and the release docs are included; tests, tools, docs,
+.git and .pkgmeta stay out.
 """
 import hashlib
 import re
@@ -40,7 +40,6 @@ def toc_entries():
 def collect():
     files = [ROOT / "NodeTaxi.toc"]
     files += sorted(p for p in ROOT.glob("*.lua") if p.is_file())
-    files += sorted(p for p in (ROOT / "Media").rglob("*") if p.is_file())
     for name in INCLUDE_ROOT_FILES:
         path = ROOT / name
         if path.exists():

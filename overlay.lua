@@ -181,6 +181,27 @@ end
 
 -- Generic node icons. The spell textures come from the client so they exist
 -- on this build; the hard-coded paths are fallbacks for older clients.
+local itemIconCache = {}
+
+local function ItemIcon(itemID)
+    local cached = itemIconCache[itemID]
+    if cached then
+        return cached
+    end
+    local texture
+    if GetItemIcon then
+        local ok, value = pcall(GetItemIcon, itemID)
+        if ok then texture = value end
+    elseif C_Item and C_Item.GetItemIconByID then
+        local ok, value = pcall(C_Item.GetItemIconByID, itemID)
+        if ok then texture = value end
+    end
+    if texture then
+        itemIconCache[itemID] = texture
+    end
+    return texture
+end
+
 local function NodeIcon(node)
     local kind = type(node) == "table" and node.kind or node
     local nodeID = type(node) == "table" and node.nodeID or nil
@@ -188,7 +209,15 @@ local function NodeIcon(node)
     if nodeID and NodeTaxi.SeedData and NodeTaxi.SeedData.icons then
         local specific = NodeTaxi.SeedData.icons[nodeID]
         if specific then
-            return specific
+            local itemID = specific:match("^item:(%d+)$")
+            if itemID then
+                local texture = ItemIcon(tonumber(itemID))
+                if texture then
+                    return texture
+                end
+            else
+                return specific
+            end
         end
     end
 
@@ -692,9 +721,9 @@ function NodeTaxi:RedrawMinimap()
         end
     end
 
-    -- GatherMate2-style minimap field: every known node in the current zone.
+    -- Blizzard-icon minimap field: every known node in the current zone.
     -- Out-of-range nodes are pulled to the rim and faded, matching
-    -- GatherMate2's default nodeRange behavior.
+    -- Rim behavior for nodes just outside the view.
     if self.settings and self.settings.allNodes then
         for _, node in ipairs(self:NodeListForMap(playerMap)) do
             local key = string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))

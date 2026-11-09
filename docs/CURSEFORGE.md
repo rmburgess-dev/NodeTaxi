@@ -16,7 +16,7 @@ It is designed for players who want to keep moving toward a destination while pi
 - **Follows your gathering tracking.** With Find Minerals active, the route targets ore. With Find Herbs, it targets herbs. Switching tracking rebuilds the route. You can override this with `/nt kind auto|herb|ore|both`.
 - **23,842 baked herb and ore nodes** across 44 WoW Forever zones, including Zephras Isle and Riverglades.
 - **Every known node is shown.** The world map and minimap draw the full known-node field, whether the zone is explored or not, and even with no active route.
-- **GatherMate2-style presentation.** Node-specific artwork at 12 px on the world map and 9 px on the minimap, full alpha, using the same GatherMate2 artwork that players already know.
+- **Blizzard item icons.** Node-specific icons at 12 px on the world map and 9 px on the minimap, resolved at runtime from Blizzard item IDs; no third-party artwork is bundled.
 - **Hollow rings up close.** Inside `/nt ring` — 100 yards by default — every nearby node changes from an icon to a hollow circle, keeping the game's own tracking dot visible in the middle. This applies to the whole node field, not only the selected route.
 - **Full minimap field.** All known nodes in the current zone appear on the minimap, including faded rim markers for nodes just outside the view. The overlay refreshes at 20 FPS.
 - **Real cross-zone travel.** NodeTaxi uses 63 paired Carbonite transition coordinates for land borders, portals, boats, zeppelins and the tram, rather than guessing at geometric map edges.
@@ -26,7 +26,7 @@ It is designed for players who want to keep moving toward a destination while pi
 - **Stable while moving.** A full leg keeps its selected nodes instead of reshuffling as you walk. When a pickup frees a slot, the rolling re-plan can add a newly nearby node.
 - **In-game settings page.** Configure routing, display, tracking and quiet chat at **Settings → AddOns → NodeTaxi**, or open it with `/nt options`.
 - **Quiet by default.** Automatic node-reached, crossing and gather messages are suppressed, but one short **route updated** line still confirms each automatic target/zone rebuild. The route updates when the TomTom target changes; enable optional rolling updates with `/nt replan 30`.
-- **Learns from you.** Successful Herb Gathering and Mining casts are remembered. `/nt import gathermate2` imports local GatherMate2 data, and `/nt here` records a manual node.
+- **Learns from you.** Successful Herb Gathering and Mining casts are remembered, and `/nt here` records a manual node.
 
 ### How the route is built
 
@@ -50,7 +50,7 @@ All of these are adjustable in game.
 
 ### Node display
 
-The display is intended to be immediately familiar to GatherMate2 users:
+The display is consistent across the world map and minimap:
 
 - **World map:** 12 px node-specific icon at full alpha.
 - **Minimap:** 9 px icon at full alpha for every known node in the zone.
@@ -126,7 +126,6 @@ Most options are available in **Settings → AddOns → NodeTaxi** (`/nt options
 | `/nt detour 1.8` | Route-length budget relative to direct distance |
 | `/nt here [herb\|ore]` | Record a node at your position |
 | `/nt near [yd]` | List nearby known nodes and their source |
-| `/nt import gathermate2` | Import local GatherMate2 herb/ore data |
 | `/nt seed` | Show the baked snapshot version |
 | `/nt debug` | Print diagnostic information |
 
@@ -134,20 +133,20 @@ Run `/nt` for the complete list, including log, validation, crossing and preview
 
 ### Data sources
 
-The baked snapshot is built from **GatherMate2 Data Wowhead classic v2026-11-08** (Forever tables), a Wowhead-derived package by Marrtin based on Spinx's classic data and Wowhead coordinate submissions.
+The baked snapshot is compiled from public Classic node coordinates and standardized by NodeTaxi.
 
 - **13,332 herbs + 10,510 ore = 23,842 nodes** across 44 zones.
 - Nine Tirisfal veins from the player's saved NodeTaxi scan are merged through `tools/extra_nodes.json`.
 - Mount Hyjal and Shen'dralas currently have no baked nodes.
 - Coordinates are user submissions at roughly two-decimal precision. Treat markers as approximate and confirm live nodes with the tracking dot and rings.
 
-Node IDs and matching artwork come from GatherMate2's tables and `Artwork/` folder. See `ATTRIBUTION.md` for full credits and third-party terms.
+Node IDs select Blizzard item icons at runtime through `GetItemIcon`. No icon files are redistributed.
 
 ### Limitations
 
 - **Not an autopilot.** The route is a suggestion. Terrain between published points is not fully modelled; cliffs, water, walls and flight paths are not avoided.
 - **Side-trips use local distance**, not a complete walkability mesh. Transport legs and zones without a generated corridor use fallback lines.
-- **The snapshot can be stale.** Let NodeTaxi learn from your casts and use `/nt import gathermate2` after updating GatherMate2.
+- **The snapshot can be stale.** Let NodeTaxi learn from your casts and update the baked snapshot when needed.
 - **The all-node field is intentionally dense.** Turn it off or lower the ring distance if it feels busy.
 - **Herb and ore only.** NodeTaxi does not route to fishing pools or treasure.
 - **No TomTom changes.** NodeTaxi never adds, removes, or retargets TomTom waypoints.
@@ -173,11 +172,11 @@ When reporting a problem, include the NodeTaxi version, `/nt debug` output, the 
 
 ### Credits
 
-TomTom (Cladhaire, Ludovicus), HereBeDragons (Nevcairiel), GatherMate2 and GatherMate2_Data (Nevcairiel, kagaro, Xinhuan, Spinx, Marrtin), Carbonite transition data, the Shortest Path Forever navmesh work, Wowhead contributors, and Blizzard's world data.
+TomTom (Cladhaire, Ludovicus), HereBeDragons (Nevcairiel), Carbonite transition data, the Shortest Path Forever navmesh work, and Blizzard's world data and item icons.
 
-**License:** NodeTaxi code is MIT. Baked data and artwork retain their third-party terms; see `LICENSE`, `LICENSE-GPL-3.0.txt` and `ATTRIBUTION.md` in the repository.
+**License:** NodeTaxi code is MIT. Route data files retain their GPLv3 terms; Blizzard icons are referenced at runtime, not redistributed. See `LICENSE` and `ATTRIBUTION.md`.
 
-**Current release:** 0.9.29.
+**Current release:** 0.9.30.
 
 ## Deutsch
 
@@ -189,7 +188,7 @@ Wichtigste Funktionen:
 - Die Route folgt dem aktiven Sammel-Tracking: Find Minerals für Erz, Find Herbs für Kräuter.
 - 23.827 gebackene Knoten in 44 Forever-Zonen.
 - Alle bekannten Knoten auf Weltkarte und Minimap, auch ohne aktive Route.
-- Darstellung wie GatherMate2: 12-px-Symbole auf der Weltkarte, 9 px auf der Minimap, volle Deckkraft.
+- Blizzard-Item-Symbole: 12 px auf der Weltkarte, 9 px auf der Minimap, volle Deckkraft.
 - Knoten innerhalb von 100 Yards werden zu hohlen Kreisen, damit der eigene Tracking-Punkt sichtbar bleibt.
 - Echte Zonenübergänge über 63 Carbonite-Paare; ausgewählte Knoten in jeder Zone.
 - Kurze Nebenwege mit maximal 4 Knoten pro Cluster und 8 pro Etappe.
@@ -212,7 +211,7 @@ Points principaux :
 - La route suit le pistage actif : Find Minerals pour le minerai, Find Herbs pour les herbes.
 - 23 827 nœuds intégrés dans 44 zones de WoW Forever.
 - Tous les nœuds connus sur la carte du monde et la minicarte, même sans route active.
-- Présentation proche de GatherMate2 : icônes de 12 px sur la carte, 9 px sur la minicarte, alpha complet.
+- Icônes d’objets Blizzard : 12 px sur la carte, 9 px sur la minicarte, alpha complet.
 - Les nœuds à moins de 100 yards deviennent des cercles creux pour laisser visible le point de pistage du jeu.
 - Vrais passages entre zones via 63 paires Carbonite ; sélection de nœuds dans chaque zone.
 - Détours courts : 4 nœuds maximum par groupe, 8 par étape.
@@ -235,7 +234,7 @@ Características principales:
 - La ruta sigue el rastreo activo: Find Minerals para mineral, Find Herbs para hierbas.
 - 23.827 nodos incluidos en 44 zonas de WoW Forever.
 - Todos los nodos conocidos en el mapa del mundo y el minimapa, incluso sin ruta activa.
-- Presentación similar a GatherMate2: iconos de 12 px en el mapa, 9 px en el minimapa, alpha completo.
+- Iconos de objetos de Blizzard: 12 px en el mapa, 9 px en el minimapa, alpha completo.
 - Los nodos a menos de 100 yardas se convierten en círculos huecos para dejar visible el punto de rastreo del juego.
 - Transiciones reales entre zonas mediante 63 pares de Carbonite; nodos seleccionados en cada zona.
 - Desvíos cortos: máximo 4 nodos por grupo y 8 por tramo.

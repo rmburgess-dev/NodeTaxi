@@ -172,6 +172,7 @@ _G.time = os.time
 _G.IsInInstance = function() return false end
 _G.hooksecurefunc = function() end
 _G.GetBuildInfo = function() return "1.60.1", "70790", "Nov 4 2026", 16001 end
+_G.GetItemIcon = function(id) return "Interface\\Icons\\Item" .. tostring(id) end
 _G.GetAddOnMetadata = function() return "0.9.27" end
 _G.GetSpellInfo = function(id)
     if id == 2366 then return "Herb Gathering" end
@@ -499,36 +500,10 @@ check("clear needs confirmation", ADDON:NodeCount(1429) == 6)
 slash("clear yes")
 check("clear yes wiped nodes", ADDON:NodeCount(nil) == 0)
 
--- GatherMate2 import: two herb keys and one ore key in Elwynn Forest.
--- 5000500000 => 50.00, 50.00; 5000620000 => 50.00, 62.00;
--- 5200560000 => 52.00, 56.00.
-_G.GatherMate2HerbDB = {
-    [1429] = {
-        [5000500000] = 401,
-        [5000620000] = 402,
-        [12345678901] = 401, -- x > 1, must be rejected
-    },
-}
-_G.GatherMate2MineDB = {
-    [1429] = { [5200560000] = 201 },
-}
-local dx, dy = ADDON.DecodeGatherMateKey(6430598000)
-check("GatherMate2 documented coord example", dx == 0.643 and dy == 0.598,
+-- Coordinate key decoding.
+local dx, dy = ADDON.DecodeNodeKey(6430598000)
+check("documented coordinate-key example", dx == 0.643 and dy == 0.598,
     tostring(dx) .. "," .. tostring(dy))
-
-slash("import gathermate2")
-check("import added three nodes", ADDON:NodeCount(1429) == 3, ADDON:NodeCount(1429))
-local herbX, herbY, herbKind
-for _, node in ipairs(ADDON:NodeListForMap(1429)) do
-    if node.kind == "herb" and math.abs(node.y - 0.62) < 1e-9 then
-        herbX, herbY, herbKind = node.x, node.y, node.kind
-    end
-end
-check("import decoded coordinates", herbX == 0.5 and herbY == 0.62 and herbKind == "herb",
-    tostring(herbX) .. "," .. tostring(herbY) .. "," .. tostring(herbKind))
-
-slash("import gathermate2")
-check("import is idempotent", ADDON:NodeCount(1429) == 3, ADDON:NodeCount(1429))
 
 -- Baked seed merge at query time (a tiny stand-in for data.lua).
 slash("clear yes")
@@ -536,8 +511,8 @@ ADDON:AddNode(1429, 0.5, 0.5, "herb") -- learned node, must survive
 ADDON.SeedData = {
     version = "test-seed",
     icons = {
-        [401] = "Interface\\AddOns\\NodeTaxi\\Media\\Herb\\peacebloom.tga",
-        [201] = "Interface\\AddOns\\NodeTaxi\\Media\\Mine\\copper.tga",
+        [401] = "item:2447",
+        [201] = "item:2770",
     },
     herbs = { [1429] = { keys = { 5000500000, 5000620000 }, ids = { 401, 402 } } },
     mines = { [1429] = { keys = { 5200560000 }, ids = { 201 } } },
@@ -546,7 +521,7 @@ local merged = ADDON:NodeListForMap(1429)
 check("seed merged into node list", #merged == 3, #merged)
 check("seed did not touch saved nodes", ADDON:NodeCount(1429) == 1, ADDON:NodeCount(1429))
 check("seed snapshot count", ADDON:SeedCount(nil) == 3, ADDON:SeedCount(nil))
-check("specific icon selected", ADDON.NodeIcon({ kind = "herb", nodeID = 401 }) == ADDON.SeedData.icons[401])
+check("specific icon selected", ADDON.NodeIcon({ kind = "herb", nodeID = 401 }):find("Item2447", 1, true) ~= nil)
 check("generic icon fallback", type(ADDON.NodeIcon({ kind = "ore" })) == "string")
 
 slash("near 50")

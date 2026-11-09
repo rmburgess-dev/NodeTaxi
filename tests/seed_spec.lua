@@ -61,7 +61,7 @@ check("Zephras Isle (2521) herbs", #(seed.herbs[2521].keys or {}) == 491, #(seed
 check("Zephras Isle (2521) mines", #(seed.mines[2521].keys or {}) == 241, #(seed.mines[2521].keys or {}))
 check("Riverglades (2548) herbs", #(seed.herbs[2548].keys or {}) == 100, #(seed.herbs[2548].keys or {}))
 
--- Unique new nodes recovered from the saved NodeTaxi/GatherMate2 scans.
+-- Unique new nodes recovered from the saved player-observed scans.
 local durotarMineKeys, tirisfalMineKeys = {}, {}
 for _, key in ipairs(seed.mines[1411].keys or {}) do durotarMineKeys[key] = true end
 for _, key in ipairs(seed.mines[1420].keys or {}) do tirisfalMineKeys[key] = true end
@@ -69,15 +69,9 @@ check("merged saved Durotar vein", durotarMineKeys[4716697300] == true)
 check("merged saved Tirisfal vein", tirisfalMineKeys[7032671800] == true)
 
 -- Specific node art is bundled and referenced by node id.
-check("copper icon mapped", type(seed.icons[201]) == "string" and seed.icons[201]:find("Mine", 1, true) ~= nil)
-check("peacebloom icon mapped", type(seed.icons[401]) == "string" and seed.icons[401]:find("Herb", 1, true) ~= nil)
-for _, info in ipairs({ { 201, "Media/Mine/copper.tga", "copper.tga" }, { 401, "Media/Herb/peacebloom.tga", "peacebloom.tga" } }) do
-    local nodeID, relative, leaf = info[1], info[2], info[3]
-    local fh = io.open(relative, "rb")
-    check("bundled icon file " .. relative, fh ~= nil)
-    if fh then fh:close() end
-    check("icon path for " .. nodeID, seed.icons[nodeID] and seed.icons[nodeID]:find(leaf, 1, true) ~= nil)
-end
+check("copper icon resolves through Blizzard item", seed.icons[201] == "item:2770", seed.icons[201])
+check("peacebloom icon resolves through Blizzard item", seed.icons[401] == "item:2447", seed.icons[401])
+check("no bundled third-party artwork", io.open("Media", "r") == nil)
 
 -- The snapshot must produce a usable route in a real zone (Elwynn Forest).
 _G.NodeTaxiNS.SeedData = seed

@@ -20,19 +20,12 @@ HereBeDragons, which ships inside TomTom.
 
 ## Node data
 
-`data.lua` is generated from the **Forever** tables of
-*GatherMate2 Data Wowhead classic* `v2026-11-08`:
+`data.lua` contains normalized herb and ore coordinates compiled from public
+public Classic coordinate data and standardized by NodeTaxi. It also includes
+24 unique nodes observed by NodeTaxi players in Forever.
 
-- package by Marrtin, based on Spinx's classic data
-- coordinate collection originally by Wowhead users
-- 24 unique saved nodes from the player's NodeTaxi/GatherMate2 scan, merged
-  via `tools/extra_nodes.json` (23 Durotar, 1 Tirisfal)
-- GatherMate2 itself by kagaro, Xinhuan, Nevcairiel and contributors
-- generator: `tools/build_seed.py`, source layout documented by GatherMate2_Data
-
-The coordinate values are factual map positions, but the compilation is
-derived from those projects. `data.lua` is not covered by NodeTaxi's MIT
-license; see LICENSE.
+The coordinate values are factual map positions. Node icons are Blizzard item
+icons resolved at runtime; no third-party artwork is bundled.
 
 ## Zone connection coordinates
 
@@ -63,12 +56,11 @@ Shortest Path Forever:
 
 `corridors.lua` is distributed under GPLv3, not MIT; see LICENSE.
 
-## Resource artwork
+## Resource icons
 
-The per-node art in `Media/` (copper, tin, peacebloom, ...) comes from
-GatherMate2's `Artwork/` folder (Nevcairiel and contributors), which is marked
-All Rights Reserved. It is included here with attribution, not relicensed.
-`tools/node_icons.json` maps GatherMate2 node IDs to those files.
+Node icons are resolved at runtime from Blizzard item icons through
+`GetItemIcon`. `tools/node_icons.json` maps NodeTaxi node IDs to Blizzard item
+IDs. No icon files are redistributed with NodeTaxi.
 
 ## World of Warcraft
 

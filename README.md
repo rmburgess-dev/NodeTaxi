@@ -67,7 +67,7 @@ Open it from chat with:
 
 The page includes routing limits, tracking filter, all-node display, ring
 distance, automatic-update behavior, quiet chat, and action buttons for route
-build/clear, preview, GatherMate2 import and reset.
+build/clear, preview and reset.
 
 Defaults are quiet for routine events: automatic node-reached, crossing and
 gather messages are suppressed. One short **route updated** line still confirms
@@ -108,7 +108,6 @@ Then, with a real TomTom waypoint set:
 | `/nt log clear` | empty the diagnostic log |
 | `/nt log chat on\|off` | toggle the one-line gather message |
 | `/nt seed` | show the baked Forever snapshot version |
-| `/nt import gathermate2` | copy herb/ore nodes out of your local GatherMate2 data |
 | `/nt skip` | skip the current node |
 | `/nt preview` | synthetic demo route |
 | `/nt width 300` | corridor half-width in yards (25-3000) |
@@ -144,12 +143,10 @@ baked snapshot lives in `data.lua` and is never written to saved variables.
 * **Updates**: by default the route is built when the TomTom target changes or
   you enter the next zone. Set `/nt replan 30` if you want optional rolling
   re-planning after movement; collected nodes are never fed back in.
-* **Markers**: node-specific resource icons at distance - Copper Vein uses the
-  copper ore art, Peacebloom the peacebloom art, and so on. The pristine
-  artwork comes from GatherMate2's `Artwork/` folder and is bundled under
-  `Media/`; node IDs from the snapshot select the icon. Learned nodes inherit
-  the nearest snapshot node's ID, and GatherMate2 imports preserve the ID.
-  A node with no known species uses the generic Herb Gathering/Mining icon.
+* **Markers**: node-specific Blizzard item icons resolved at runtime through
+  `GetItemIcon`. Copper Vein uses the copper ore item icon, Peacebloom the
+  peacebloom item icon, and so on; no third-party artwork is bundled. A node
+  with no known species uses the generic Herb Gathering/Mining spell icon.
   Within `ring` yards any node in the field is replaced by a hollow ring, so the
   game's own tracking dot remains visible in the middle.
 * The planner is pure Lua (`route.lua`), so it runs without the WoW API and is
@@ -220,59 +217,40 @@ corridor spine itself is never painted.
 
 ### All node icons
 
-By default every known node under the map you are viewing is drawn with the
-same GatherMate2 presentation: 12 px icon at full alpha on the world map
-(9 px on the minimap), using the node-specific artwork. Zone view shows that
-zone, continent view every zone under it, and the world view every known zone.
-The minimap also shows all known nodes in the current zone, including rim
-markers for nodes just outside the view. This does not depend on the zone
-being explored and works with no active route. Selected route nodes stay bright
-and connected by the dashed journey line. Toggle the full field with
-`/nt allnodes off` or back on with `/nt allnodes on`. Tracking filtering still
-applies (`/nt kind auto`).
+By default every known node under the map you are viewing is drawn with a
+12 px Blizzard item icon at full alpha on the world map and 9 px on the
+minimap. Zone view shows that zone, continent view every zone under it, and the
+world view every known zone. The minimap also shows all known nodes in the
+current zone, including rim markers for nodes just outside the view. This does
+not depend on the zone being explored and works with no active route. Selected
+route nodes stay bright and connected by the dashed journey line. Toggle the
+full field with `/nt allnodes off` or back on with `/nt allnodes on`. Tracking
+filtering still applies (`/nt kind auto`).
 
 ### Baked Forever snapshot (included)
 
-`data.lua` is generated from the **Forever** tables of *GatherMate2 Data
-Wowhead classic* `v2026-11-08`, a Wowhead-derived package by Marrtin based on
-Spinx's classic data. It keeps each node's coordinate key **and** its
-GatherMate2 node ID, so the matching resource art can be selected:
+`data.lua` stores standard normalized coordinates and node IDs compiled from
+public Classic gathering data. It keeps each node's coordinate key and
+its canonical node ID, so the matching Blizzard item icon can be selected:
 
-* **13,332 herbs + 10,510 ore = 23,842 nodes** across 44 zones. The updated
-  Wowhead-derived package has the same base coordinates as the prior bake;
-  24 unique saved nodes are merged in from `tools/extra_nodes.json` (23 Durotar, 1 Tirisfal).
+* **13,332 herbs + 10,510 ore = 23,842 nodes** across 44 zones.
+* 24 unique player-observed nodes are merged in from `tools/extra_nodes.json`.
 * Includes the new **Zephras Isle (2521)** and **Riverglades (2548)** zones.
-* Compared with the mature Classic Era table, about 92% of the coordinate keys
-  overlap; the remainder is new or changed.
-* **Mount Hyjal (2482)** and **Shen'dralas (2652)** have no data in that
-  snapshot yet, so those zones rely on your own gathering.
+* **Mount Hyjal (2482)** and **Shen'dralas (2652)** have no baked data yet, so
+  those zones rely on your own gathering.
 
 The snapshot is read-only addon data. It is merged into the route at query
-time and is **not** copied into `NodeTaxiDB`, so 23k baked nodes do not bloat
-SavedVariables; only nodes you learn or import are persisted. Its node IDs
-select the bundled art under `Media/` (attribution: GatherMate2 Artwork by
-Nevcairiel). `/nt seed` prints
-the snapshot version and size, and `/nt nodes` shows how many baked nodes exist
-in the current zone.
+time and is **not** copied into `NodeTaxiDB`, so the baked nodes do not bloat
+SavedVariables; only nodes you learn are persisted. `/nt seed` prints the
+snapshot version and size, and `/nt nodes` shows how many baked nodes exist in
+the current zone.
 
-`tools/build_seed.py` regenerates `data.lua` from an extracted
-`GatherMate2_Data/Forever` folder:
+`tools/build_seed.py` regenerates `data.lua` from a supported Classic data
+package in the documented Lua layout:
 
 ```
-python3 tools/build_seed.py /path/to/GatherMate2_Data/Forever
+python3 tools/build_seed.py /path/to/classic-data/Forever
 ```
-
-### Refresh from a local GatherMate2 install (optional)
-
-When a newer data package is released, you can pull it through GatherMate2
-without waiting for a NodeTaxi build:
-
-1. Install **GatherMate2** (Forever build) and a Forever-capable data package.
-2. In game: `/gathermate` -> Import -> Herbs and Mining -> Import.
-3. In game: `/nt import gathermate2`.
-
-This reads `GatherMate2HerbDB` / `GatherMate2MineDB` from your saved variables,
-decodes GatherMate2's coordinate keys, and merges them with the baked snapshot.
 
 ### Your own gathering
 
@@ -280,7 +258,7 @@ NodeTaxi's built-in learning and `/nt here` remain the only source guaranteed
 to match the server's current spawns. Use it to correct stale coordinates and
 to fill the new zones that the snapshot does not cover yet.
 
-**Reliability caveat:** the baked coordinates are Wowhead user submissions,
+**Reliability caveat:** the baked coordinates are public coordinate submissions,
 stored at roughly two-decimal precision (about 100 yards in a large zone).
 They are a good starting map, not ground truth; spawns can be phased, removed,
 or changed by a Forever update.
@@ -342,11 +320,10 @@ survives a session and can be inspected offline.
   route is a suggestion, not an autopilot. Re-planning every 30 yards does not
   know about obstacles either.
 * **Node data is a snapshot, not authoritative.** The baked data is from
-  2026-11-08 and is Wowhead-derived; it can be stale, incomplete, or from a
-  different phase. Mount Hyjal and Shen'dralas have no baked nodes yet. Learned
-  nodes that do not match any snapshot node have no species ID, so they use the
-  generic herb/ore icon. Let the addon learn from your own harvests and use
-  `/nt import gathermate2` for refreshed packages.
+  2026-11-08; it can be stale, incomplete, or from a different phase. Mount
+  Hyjal and Shen'dralas have no baked nodes yet. Learned nodes that do not match
+  any snapshot node have no species ID, so they use the generic herb/ore icon.
+  Let the addon learn from your own harvests.
 * **Minimap drawing needs `C_Minimap.GetViewRadius`** (present in this client)
   and HereBeDragons for world coordinates. World-map drawing uses the map
   canvas that RareScanner also uses on this client.
@@ -361,12 +338,11 @@ survives a session and can be inspected offline.
 | File | Purpose |
 | --- | --- |
 | `NodeTaxi.toc` | load order, dependency on TomTom |
-| `data.lua` | generated Forever snapshot: coordinate keys, node IDs, icon map |
-| `Media/` | bundled per-node resource art (Copper Vein, Peacebloom, ...) |
-| `tools/build_seed.py` | regenerates `data.lua` from a GatherMate2 data package |
-| `tools/node_icons.json` | node ID to artwork mapping used by the generator |
+| `data.lua` | generated snapshot: coordinate keys, node IDs, item-icon map |
+| `tools/build_seed.py` | regenerates `data.lua` from a Classic data package |
+| `tools/node_icons.json` | node ID to Blizzard item-ID mapping |
 | `route.lua` | corridor filter, nearest neighbour, 2-opt, map projection |
-| `core.lua` | node learning, GatherMate2 import, TomTom target adapter, state machine, slash commands |
+| `core.lua` | node learning, TomTom target adapter, state machine, slash commands |
 | `overlay.lua` | world-map canvas overlay + minimap projection/overlay |
 | `tests/route_spec.lua` | planner and projection unit tests |
 | `tests/seed_spec.lua` | validates the baked snapshot (counts, coordinates) |
@@ -399,15 +375,14 @@ python3 tools/package.py      # dist/NodeTaxi-<version>.zip
 python3 tools/make_icon.py    # docs/icon-256.png, docs/icon-512.png
 ```
 
-`tools/build_seed.py` regenerates `data.lua` from an extracted
-`GatherMate2_Data/Forever` folder; `tools/node_icons.json` maps GatherMate2
-node IDs to the bundled artwork.
+`tools/build_seed.py` regenerates `data.lua` from a supported Classic data
+package; `tools/node_icons.json` maps node IDs to Blizzard item IDs.
 
 ## License and credits
 
-Original code is MIT (see `LICENSE`). The baked node data and the artwork in
-`Media/` are third-party, attributed in `ATTRIBUTION.md`, and are not covered
-by the MIT grant. TomTom is required and not bundled.
+Original code is MIT (see `LICENSE`). Baked node coordinates are standardized
+public Classic data; Blizzard item icons are resolved at runtime and
+not redistributed. TomTom is required and not bundled.
 
 ## In-game checklist
 

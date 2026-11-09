@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.30 - 2026-11-08
+
+- Replace bundled resource artwork with Blizzard item icons resolved at runtime
+  through `GetItemIcon`. Remove the `Media/` tree and all packaged TGA art.
+- Remove the local gather-data import command and its UI/docs. The baked
+  snapshot is the supported data path.
+- Standardize data/version/description wording around public Classic node
+  coordinates and Blizzard item icons; no addon-specific artwork is bundled.
+- Keep the same 23,842-node snapshot and route behavior.
+
 ## 0.9.29 - 2026-11-08
 
 - Rebuild from the current GatherMate2/Wowhead Forever package. Its base

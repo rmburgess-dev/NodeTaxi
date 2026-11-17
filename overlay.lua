@@ -724,7 +724,7 @@ function NodeTaxi:RedrawMinimap()
     -- Blizzard-icon minimap field: every known node in the current zone.
     -- Out-of-range nodes are pulled to the rim and faded, matching
     -- Rim behavior for nodes just outside the view.
-    if self.settings and self.settings.allNodes then
+    if self.settings and self.settings.minimapNodes ~= false then
         for _, node in ipairs(self:NodeListForMap(playerMap)) do
             local key = string.format("%.4f,%.4f,%s", node.x, node.y, tostring(node.kind))
             if not selected[key] then

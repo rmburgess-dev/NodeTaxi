@@ -65,8 +65,8 @@ Open it from chat with:
 /nt options
 ```
 
-The page includes routing limits, tracking filter, all-node display, ring
-distance, automatic-update behavior, quiet chat, and action buttons for route
+The page includes routing limits, tracking filter, world-map/minimap node
+fields, ring distance, automatic-update behavior, quiet chat, and action buttons for route
 build/clear, preview and reset.
 
 Defaults are quiet for routine events: automatic node-reached, crossing and
@@ -119,6 +119,8 @@ Then, with a real TomTom waypoint set:
 | `/nt replan 0` | rolling update distance (0 = only new TomTom target; default) |
 | `/nt ring 100` | yards at which a node marker becomes a hollow ring (0 = off) |
 | `/nt auto on\|off` | rebuild automatically when the TomTom target changes |
+| `/nt allnodes on\|off` | show every known node on the world map (default off) |
+| `/nt minimapnodes on\|off` | show every known node on the minimap (default on) |
 | `/nt quiet on\|off` | suppress automatic route/gather/crossing chat (default on) |
 | `/nt options` | open Settings → AddOns → NodeTaxi |
 | `/nt kind auto\|herb\|ore\|both` | node filter; `auto` follows active tracking (default) |
@@ -217,15 +219,14 @@ corridor spine itself is never painted.
 
 ### All node icons
 
-By default every known node under the map you are viewing is drawn with a
-12 px Blizzard item icon at full alpha on the world map and 9 px on the
-minimap. Zone view shows that zone, continent view every zone under it, and the
-world view every known zone. The minimap also shows all known nodes in the
-current zone, including rim markers for nodes just outside the view. This does
-not depend on the zone being explored and works with no active route. Selected
-route nodes stay bright and connected by the dashed journey line. Toggle the
-full field with `/nt allnodes off` or back on with `/nt allnodes on`. Tracking
-filtering still applies (`/nt kind auto`).
+The **world-map node field is off by default**, keeping the map focused on the
+route. Enable it with `/nt allnodes on` or the settings page. The **minimap
+field is on by default**, showing every known node in the current zone,
+including rim markers for nodes just outside the view. Both use 12 px/9 px
+Blizzard item icons at full alpha and work with no active route. Selected route
+nodes stay bright and connected by the dashed journey line. Tracking filtering
+still applies (`/nt kind auto`). Disable the minimap field with
+`/nt minimapnodes off`.
 
 ### Baked Forever snapshot (included)
 

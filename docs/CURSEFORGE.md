@@ -15,7 +15,7 @@ It is designed for players who want to keep moving toward a destination while pi
 - **TomTom-native, read-only routing.** Your arrow and destination stay exactly where TomTom put them. NodeTaxi only reads the active arrow target.
 - **Follows your gathering tracking.** With Find Minerals active, the route targets ore. With Find Herbs, it targets herbs. Switching tracking rebuilds the route. You can override this with `/nt kind auto|herb|ore|both`.
 - **26,425 baked herb and ore nodes** across 44 WoW Forever zones, including Zephras Isle and Riverglades.
-- **Every known node is shown.** The world map and minimap draw the full known-node field, whether the zone is explored or not, and even with no active route.
+- **Node fields are optional.** The minimap draws the full known-node field by default; the world-map field is off by default for a cleaner route view and can be enabled with `/nt allnodes on`. Both work without an active route.
 - **Blizzard item icons.** Node-specific icons at 12 px on the world map and 9 px on the minimap, resolved at runtime from Blizzard item IDs; no third-party artwork is bundled.
 - **Hollow rings up close.** Inside `/nt ring` — 100 yards by default — every nearby node changes from an icon to a hollow circle, keeping the game's own tracking dot visible in the middle. This applies to the whole node field, not only the selected route.
 - **Full minimap field.** All known nodes in the current zone appear on the minimap, including faded rim markers for nodes just outside the view. The overlay refreshes at 20 FPS.
@@ -58,7 +58,7 @@ The display is consistent across the world map and minimap:
 - **Rim nodes:** nodes just outside the minimap view fade onto the rim rather than disappearing abruptly.
 - **Route nodes:** the next node pulses; selected nodes stay visually connected to the dashed journey line.
 
-If the full node field feels too dense for a particular session, `/nt allnodes off` switches to a route-only view. Tracking filtering still applies.
+The minimap field can be disabled with `/nt minimapnodes off`. The world-map field can be enabled with `/nt allnodes on`. Tracking filtering still applies.
 
 ### Multi-zone travel
 
@@ -100,7 +100,7 @@ Useful first commands:
 
 ```
 /nt preview      -- synthetic route to test the overlay
-/nt allnodes on  -- show every known node (default)
+/nt allnodes on  -- show every known node on the world map
 /nt debug        -- position, tracking, snapshot, overlay diagnostics
 ```
 
@@ -113,7 +113,8 @@ Most options are available in **Settings → AddOns → NodeTaxi** (`/nt options
 | `/nt route` | Build or rebuild the route to TomTom's active target |
 | `/nt stop` | Clear the route overlay |
 | `/nt dest` | Show the current TomTom target |
-| `/nt allnodes on\|off` | Toggle the full known-node field |
+| `/nt allnodes on\|off` | Toggle the world-map known-node field (default off) |
+| `/nt minimapnodes on\|off` | Toggle the minimap known-node field (default on) |
 | `/nt kind auto\|herb\|ore\|both` | Resource filter; `auto` follows active tracking |
 | `/nt max 8` | Maximum selected nodes per leg |
 | `/nt cluster 4` | Maximum nodes from one nearby cluster |
@@ -147,7 +148,7 @@ Node IDs select Blizzard item icons at runtime through `GetItemIcon`. No icon fi
 - **Not an autopilot.** The route is a suggestion. Terrain between published points is not fully modelled; cliffs, water, walls and flight paths are not avoided.
 - **Side-trips use local distance**, not a complete walkability mesh. Transport legs and zones without a generated corridor use fallback lines.
 - **The snapshot can be stale.** Let NodeTaxi learn from your casts and update the baked snapshot when needed.
-- **The all-node field is intentionally dense.** Turn it off or lower the ring distance if it feels busy.
+- **The minimap all-node field can be dense.** Turn it off or lower the ring distance if it feels busy.
 - **Herb and ore only.** NodeTaxi does not route to fishing pools or treasure.
 - **No TomTom changes.** NodeTaxi never adds, removes, or retargets TomTom waypoints.
 
@@ -156,7 +157,7 @@ Node IDs select Blizzard item icons at runtime through `GetItemIcon`. No icon fi
 - `/nt debug` prints client build, tracking state, position, snapshot version, and overlay status.
 - `/nt seed` confirms the baked data version.
 - `/nt near 100` lists what NodeTaxi knows around you and whether each node came from the snapshot, an import, or a scan.
-- `/nt allnodes off` gives a route-only view.
+- `/nt minimapnodes off` and `/nt allnodes off` give route-only map and minimap views.
 - If a route is empty, set the TomTom target to a zone map and run `/nt route` again.
 - If the route shape is wrong, include the zone, tracking type and a screenshot in a GitHub issue.
 
@@ -176,7 +177,7 @@ TomTom (Cladhaire, Ludovicus), HereBeDragons (Nevcairiel), Carbonite transition 
 
 **License:** NodeTaxi code is MIT. Route data files retain their GPLv3 terms; Blizzard icons are referenced at runtime, not redistributed. See `LICENSE` and `ATTRIBUTION.md`.
 
-**Current release:** 0.9.31.
+**Current release:** 0.9.32.
 
 ## Deutsch
 
@@ -187,7 +188,7 @@ Wichtigste Funktionen:
 - TomTom bleibt unverändert: kein neuer Wegpunkt, kein bewegter Pfeil, kein geändertes Ziel.
 - Die Route folgt dem aktiven Sammel-Tracking: Find Minerals für Erz, Find Herbs für Kräuter.
 - 23.827 gebackene Knoten in 44 Forever-Zonen.
-- Alle bekannten Knoten auf Weltkarte und Minimap, auch ohne aktive Route.
+- Alle bekannten Knoten auf der Minimap, auch ohne aktive Route; die Weltkarte ist standardmäßig auf die Route reduziert.
 - Blizzard-Item-Symbole: 12 px auf der Weltkarte, 9 px auf der Minimap, volle Deckkraft.
 - Knoten innerhalb von 100 Yards werden zu hohlen Kreisen, damit der eigene Tracking-Punkt sichtbar bleibt.
 - Echte Zonenübergänge über 63 Carbonite-Paare; ausgewählte Knoten in jeder Zone.
@@ -210,7 +211,7 @@ Points principaux :
 - TomTom reste intact : aucun waypoint ajouté, aucune flèche déplacée, aucune destination remplacée.
 - La route suit le pistage actif : Find Minerals pour le minerai, Find Herbs pour les herbes.
 - 23 827 nœuds intégrés dans 44 zones de WoW Forever.
-- Tous les nœuds connus sur la carte du monde et la minicarte, même sans route active.
+- Tous les nœuds connus sur la minicarte, même sans route active ; la carte du monde est épurée par défaut.
 - Icônes d’objets Blizzard : 12 px sur la carte, 9 px sur la minicarte, alpha complet.
 - Les nœuds à moins de 100 yards deviennent des cercles creux pour laisser visible le point de pistage du jeu.
 - Vrais passages entre zones via 63 paires Carbonite ; sélection de nœuds dans chaque zone.
@@ -233,7 +234,7 @@ Características principales:
 - TomTom permanece intacto: no se añaden waypoints, no se mueve la flecha y no se cambia el destino.
 - La ruta sigue el rastreo activo: Find Minerals para mineral, Find Herbs para hierbas.
 - 23.827 nodos incluidos en 44 zonas de WoW Forever.
-- Todos los nodos conocidos en el mapa del mundo y el minimapa, incluso sin ruta activa.
+- Todos los nodos conocidos en el minimapa, incluso sin ruta activa; el mapa del mundo se muestra limpio por defecto.
 - Iconos de objetos de Blizzard: 12 px en el mapa, 9 px en el minimapa, alpha completo.
 - Los nodos a menos de 100 yardas se convierten en círculos huecos para dejar visible el punto de rastreo del juego.
 - Transiciones reales entre zonas mediante 63 pares de Carbonite; nodos seleccionados en cada zona.

@@ -719,7 +719,8 @@ ADDON:BuildFallbackLeg(fallbackLeg)
 check("no-corridor leg has a visible fallback line",
     fallbackLeg.routePoints and #fallbackLeg.routePoints == 3,
     fallbackLeg.routePoints and #fallbackLeg.routePoints)
-check("all-node display defaults on", ADDON.settings.allNodes == true)
+check("world-map all-node display defaults off", ADDON.settings.allNodes == false)
+check("minimap all-node display defaults on", ADDON.settings.minimapNodes ~= false)
 check("node deviation defaults to 100 yards", ADDON.settings.spur == 100,
     ADDON.settings.spur)
 check("cluster cap defaults to 4", ADDON.settings.cluster == 4, ADDON.settings.cluster)

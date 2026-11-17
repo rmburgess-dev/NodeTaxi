@@ -29,7 +29,8 @@ local DEFAULTS = {
     routeChat = true, -- keep one short line when an automatic route is built
     debug = false,
     welcome = false,
-    allNodes = true,  -- draw every known node under the displayed map
+    allNodes = false, -- draw every known node under the displayed world map
+    minimapNodes = true, -- draw every known node in the current minimap zone
     spur = 100,      -- max yards a selected node may pull away from the reference
     cluster = 4,     -- max nodes selected from one nearby cluster
 }
@@ -298,7 +299,7 @@ local function InitDB()
     NodeTaxiDB = NodeTaxiDB or {}
     db = NodeTaxiDB
     local oldVersion = db.version or 1
-    db.version = 5
+    db.version = 6
 
     db.settings = db.settings or {}
     for key, value in pairs(DEFAULTS) do
@@ -328,6 +329,12 @@ local function InitDB()
         if db.settings.logChat == true then
             db.settings.logChat = false
         end
+    end
+
+    -- 0.9.32: the world-map all-node field is off by default; the minimap
+    -- field remains on unless explicitly disabled.
+    if oldVersion < 6 and db.settings.allNodes == true then
+        db.settings.allNodes = false
     end
 
     db.nodes = db.nodes or {}
@@ -2782,7 +2789,8 @@ local function PrintHelp()
     Print("  /nt replan 30      yards moved before the remaining route is re-ordered (0 = off)")
     Print("  /nt ring 100       yards at which a node marker becomes a hollow ring (0 = off)")
     Print("  /nt auto on|off    rebuild when the arrow target changes")
-    Print("  /nt allnodes on|off show every known node under the displayed map")
+    Print("  /nt allnodes on|off show every known node on the displayed world map")
+    Print("  /nt minimapnodes on|off show every known node on the minimap")
     Print("  /nt spur 100      max yards a node may pull away from the route")
     Print("  /nt cluster 4     max nodes from one nearby cluster")
     Print("  /nt kind auto|herb|ore|both  node filter; auto follows your tracking")
@@ -3244,7 +3252,17 @@ local function HandleCommand(message)
             if state.route then
                 NodeTaxi:Redraw()
             end
-            Print("all node icons " .. (value and "on" or "off") .. ".")
+            Print("world-map node field " .. (value and "on" or "off") .. ".")
+        end
+
+    elseif command == "minimapnodes" then
+        local value = OnOff(rest:lower())
+        if value == nil then
+            Print("usage: /nt minimapnodes on|off")
+        else
+            settings.minimapNodes = value
+            if NodeTaxi.RedrawMinimap then NodeTaxi:RedrawMinimap() end
+            Print("minimap node field " .. (value and "on" or "off") .. ".")
         end
 
     elseif command == "spur" then

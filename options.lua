@@ -99,8 +99,10 @@ function NodeTaxi:BuildOptions()
         "How far you move before the current leg is re-evaluated. Zero updates only when the TomTom target changes.", " yd")
 
     addHeader(category, "Display")
-    addCheckbox(category, "allNodes", "Show every known node",
-        "Draws the full known-node field on the world map and minimap. Turn off for a route-only view.")
+    addCheckbox(category, "allNodes", "Show every known node on the world map",
+        "Draws the full known-node field on the world map. Off by default for a cleaner route view.")
+    addCheckbox(category, "minimapNodes", "Show every known node on the minimap",
+        "Draws the full known-node field in the current minimap zone. On by default.")
     addCheckbox(category, "quiet", "Quiet routine automatic chat",
         "Suppresses automatic node-reached, crossing and gather messages. Manual /nt commands and the short route-update line still respond.")
     addCheckbox(category, "routeChat", "Show a short route-update line",

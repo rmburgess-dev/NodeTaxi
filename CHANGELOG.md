@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.32 - 2026-11-16
+
+- Default the world-map known-node field to **off**. The map now shows only the
+  route and selected nodes unless `/nt allnodes on` is used.
+- Keep the minimap known-node field on by default; add
+  `/nt minimapnodes on|off` and a separate settings checkbox.
+- Migrate existing installs with the old world-map field enabled to the new
+  default.
+
 ## 0.9.31 - 2026-11-16
 
 - Scan the new v42 Classic data package and union its additions into the

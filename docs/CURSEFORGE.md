@@ -14,7 +14,7 @@ It is designed for players who want to keep moving toward a destination while pi
 
 - **TomTom-native, read-only routing.** Your arrow and destination stay exactly where TomTom put them. NodeTaxi only reads the active arrow target.
 - **Follows your gathering tracking.** With Find Minerals active, the route targets ore. With Find Herbs, it targets herbs. Switching tracking rebuilds the route. You can override this with `/nt kind auto|herb|ore|both`.
-- **23,842 baked herb and ore nodes** across 44 WoW Forever zones, including Zephras Isle and Riverglades.
+- **26,425 baked herb and ore nodes** across 44 WoW Forever zones, including Zephras Isle and Riverglades.
 - **Every known node is shown.** The world map and minimap draw the full known-node field, whether the zone is explored or not, and even with no active route.
 - **Blizzard item icons.** Node-specific icons at 12 px on the world map and 9 px on the minimap, resolved at runtime from Blizzard item IDs; no third-party artwork is bundled.
 - **Hollow rings up close.** Inside `/nt ring` — 100 yards by default — every nearby node changes from an icon to a hollow circle, keeping the game's own tracking dot visible in the middle. This applies to the whole node field, not only the selected route.
@@ -135,7 +135,7 @@ Run `/nt` for the complete list, including log, validation, crossing and preview
 
 The baked snapshot is compiled from public Classic node coordinates and standardized by NodeTaxi.
 
-- **13,332 herbs + 10,510 ore = 23,842 nodes** across 44 zones.
+- **13,332 herbs + 10,510 ore = 26,425 nodes** across 46 herb and 42 ore zones.
 - Nine Tirisfal veins from the player's saved NodeTaxi scan are merged through `tools/extra_nodes.json`.
 - Mount Hyjal and Shen'dralas currently have no baked nodes.
 - Coordinates are user submissions at roughly two-decimal precision. Treat markers as approximate and confirm live nodes with the tracking dot and rings.
@@ -176,7 +176,7 @@ TomTom (Cladhaire, Ludovicus), HereBeDragons (Nevcairiel), Carbonite transition 
 
 **License:** NodeTaxi code is MIT. Route data files retain their GPLv3 terms; Blizzard icons are referenced at runtime, not redistributed. See `LICENSE` and `ATTRIBUTION.md`.
 
-**Current release:** 0.9.30.
+**Current release:** 0.9.31.
 
 ## Deutsch
 

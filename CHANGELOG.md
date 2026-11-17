@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.31 - 2026-11-16
+
+- Scan the new v42 Classic data package and union its additions into the
+  existing snapshot: 1,667 new herb keys and 916 new ore keys.
+- Update 758 changed ore node IDs.
+- Preserve old keys the newer package omits, so coverage does not regress.
+- Baked total: **14,999 herbs + 11,426 ore = 26,425 nodes** across 46 herb and
+  42 ore zones.
+- Blizzard item-icon rendering and route behavior are unchanged.
+
 ## 0.9.30 - 2026-11-08
 
 - Replace bundled resource artwork with Blizzard item icons resolved at runtime

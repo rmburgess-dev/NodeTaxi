@@ -16,7 +16,7 @@ reads the active target once at login) to learn *where* you are going.
 
 ## What it does
 
-1. Starts with **23,842 baked herb/ore nodes** across 44 Forever zones, then
+1. Starts with **26,425 baked herb/ore nodes** across 46 herb and 42 ore zones, then
    learns more from your own **Herb Gathering** and **Mining** casts and
    manual `/nt here` marks. By default it follows the player's *active*
    minimap tracking (Find Herbs or Find Minerals) and only routes to that
@@ -233,7 +233,7 @@ filtering still applies (`/nt kind auto`).
 public Classic gathering data. It keeps each node's coordinate key and
 its canonical node ID, so the matching Blizzard item icon can be selected:
 
-* **13,332 herbs + 10,510 ore = 23,842 nodes** across 44 zones.
+* **13,332 herbs + 10,510 ore = 26,425 nodes** across 46 herb and 42 ore zones.
 * 24 unique player-observed nodes are merged in from `tools/extra_nodes.json`.
 * Includes the new **Zephras Isle (2521)** and **Riverglades (2548)** zones.
 * **Mount Hyjal (2482)** and **Shen'dralas (2652)** have no baked data yet, so

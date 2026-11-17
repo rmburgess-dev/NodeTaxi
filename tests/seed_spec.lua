@@ -48,18 +48,18 @@ check("seed has a version", type(seed.version) == "string" and #seed.version > 0
 local herbZones, herbNodes = count(seed.herbs)
 local mineZones, mineNodes = count(seed.mines)
 
-check("herb zone count", herbZones == 44, herbZones)
-check("herb node count", herbNodes == 13332, herbNodes)
-check("mine zone count", mineZones == 40, mineZones)
-check("mine node count", mineNodes == 10510, mineNodes)
+check("herb zone count", herbZones == 46, herbZones)
+check("herb node count", herbNodes == 14999, herbNodes)
+check("mine zone count", mineZones == 42, mineZones)
+check("mine node count", mineNodes == 11426, mineNodes)
 
 validate(seed.herbs, "herbs")
 validate(seed.mines, "mines")
 
 -- The Forever snapshot covers the new Zephras Isle and Riverglades zones.
-check("Zephras Isle (2521) herbs", #(seed.herbs[2521].keys or {}) == 491, #(seed.herbs[2521].keys or {}))
-check("Zephras Isle (2521) mines", #(seed.mines[2521].keys or {}) == 241, #(seed.mines[2521].keys or {}))
-check("Riverglades (2548) herbs", #(seed.herbs[2548].keys or {}) == 100, #(seed.herbs[2548].keys or {}))
+check("Zephras Isle (2521) herbs", #(seed.herbs[2521].keys or {}) == 803, #(seed.herbs[2521].keys or {}))
+check("Zephras Isle (2521) mines", #(seed.mines[2521].keys or {}) == 361, #(seed.mines[2521].keys or {}))
+check("Riverglades (2548) herbs", #(seed.herbs[2548].keys or {}) == 172, #(seed.herbs[2548].keys or {}))
 
 -- Unique new nodes recovered from the saved player-observed scans.
 local durotarMineKeys, tirisfalMineKeys = {}, {}
